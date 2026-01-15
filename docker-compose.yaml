@@ -1,0 +1,48 @@
+version: "3.8"
+
+services:
+  explorer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hyperledger/fabric-x-explorer:latest
+    restart: unless-stopped
+    environment:
+      # Sidecar settings
+      SIDECAR_HOST: "host.docker.internal"
+      SIDECAR_PORT: "4001"
+      SIDECAR_CHANNEL: "mychannel"
+      SIDECAR_START_BLOCK: "0"
+      # SIDECAR_END_BLOCK: "0"   # optional; omit or set to a large value for "no upper limit"
+
+      # Database settings
+      DB_HOST: "host.docker.internal"
+      DB_PORT: "5432"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_NAME: "explorer"
+      DB_SSLMODE: "disable"
+
+      # Server / runtime tuning
+      HTTP_ADDR: ":8080"
+      HTTP_SHUTDOWN_TIMEOUT_SEC: "10"
+      WRITER_WAIT_TIMEOUT_SEC: "15"
+
+      # Pipeline tuning
+      RAW_CHANNEL_SIZE: "200"
+      PROCESS_CHANNEL_SIZE: "200"
+      PROCESS_WORKERS: "2"
+      WRITE_WORKERS: "2"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # logging:
+    #   driver: "json-file"
+    #   options:
+    #     max-size: "10m"
+    #     max-file: "3"

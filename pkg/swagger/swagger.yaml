@@ -1,0 +1,174 @@
+openapi: 3.0.0
+info:
+  title: Fabric-X Block Explorer API
+  version: 1.0.0
+
+paths:
+  /blocks/height:
+    get:
+      summary: Get current block height
+      responses:
+        '200':
+          description: Block height
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  height:
+                    type: integer
+                    format: int64
+
+  /blocks/{block_num}:
+    get:
+      summary: Get block details with transactions and writes
+      parameters:
+        - name: block_num
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: limitTx
+          in: query
+          schema:
+            type: integer
+        - name: offsetTx
+          in: query
+          schema:
+            type: integer
+        - name: limitWrites
+          in: query
+          schema:
+            type: integer
+        - name: offsetWrites
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Block details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockResponse'
+
+  /tx/{tx_id_hex}:
+    get:
+      summary: Get transaction by tx_id
+      parameters:
+        - name: tx_id_hex
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transaction details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TxWithBlockResponse'
+
+  /healthz:
+    get:
+      summary: Liveness and readiness probe
+      description: >
+        Combined liveness/readiness endpoint. Returns 200 when the process is alive
+        and the application is ready (database reachable). Returns 503 when the
+        application is alive but not ready (for example, DB ping failed).
+      responses:
+        '200':
+          description: Service is healthy and ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Service is alive but not ready (readiness check failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  schemas:
+    BlockResponse:
+      type: object
+      properties:
+        block_num:
+          type: integer
+        tx_count:
+          type: integer
+        previous_hash:
+          type: string
+        data_hash:
+          type: string
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionWithWriteSets'
+
+    TransactionWithWriteSets:
+      type: object
+      properties:
+        id:
+          type: integer
+        block_num:
+          type: integer
+        tx_num:
+          type: integer
+        tx_id:
+          type: string
+        validation_code:
+          type: integer
+        writes:
+          type: array
+          items:
+            $ref: '#/components/schemas/WriteRecord'
+
+    WriteRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        namespace_id:
+          type: integer
+        block_num:
+          type: integer
+        tx_num:
+          type: integer
+        tx_id:
+          type: string
+        key:
+          type: string
+        value:
+          type: string
+        is_delete:
+          type: boolean
+
+    TxWithBlockResponse:
+      type: object
+      properties:
+        transaction:
+          $ref: '#/components/schemas/TransactionWithWriteSets'
+        block:
+          type: object
+          properties:
+            block_num:
+              type: integer
+            tx_count:
+              type: integer
+            previous_hash:
+              type: string
+            data_hash:
+              type: string
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: "ok when ready; unavailable when readiness check failed"
+        details:
+          type: string
+          description: "optional human-readable details when status is unavailable"
