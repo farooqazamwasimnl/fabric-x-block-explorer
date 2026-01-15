@@ -18,8 +18,8 @@ services:
       # Database settings
       DB_HOST: "host.docker.internal"
       DB_PORT: "5432"
-      DB_USER: "postgres"
-      DB_PASSWORD: "postgres"
+      DB_USER: ""
+      DB_PASSWORD: ""
       DB_NAME: "explorer"
       DB_SSLMODE: "disable"
 
