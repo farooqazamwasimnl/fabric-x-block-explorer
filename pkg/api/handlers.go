@@ -127,7 +127,6 @@ func (a *API) GetBlockByNumber(w http.ResponseWriter, r *http.Request) {
 				TxID:        hex.EncodeToString(wrec.TxID),
 				Key:         hex.EncodeToString(wrec.Key),
 				Value:       hex.EncodeToString(wrec.Value),
-				IsDelete:    wrec.IsDelete,
 			})
 		}
 
@@ -192,7 +191,6 @@ func (a *API) GetTxByID(w http.ResponseWriter, r *http.Request) {
 			TxID:        hex.EncodeToString(wrec.TxID),
 			Key:         hex.EncodeToString(wrec.Key),
 			Value:       hex.EncodeToString(wrec.Value),
-			IsDelete:    wrec.IsDelete,
 		})
 	}
 

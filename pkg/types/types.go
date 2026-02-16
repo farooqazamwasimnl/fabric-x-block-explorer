@@ -25,9 +25,8 @@ type KVRead struct {
 }
 
 type KVWrite struct {
-	Key      string
-	IsDelete bool
-	Value    []byte
+	Key   string
+	Value []byte
 }
 
 type Version struct {
@@ -42,7 +41,6 @@ type WriteRecord struct {
 	BlockNum       uint64
 	TxNum          uint64
 	Value          []byte
-	IsDelete       bool
 	TxID           string
 	ValidationCode int32
 }
@@ -57,7 +55,6 @@ func Records(namespace string, blockNum, txNum uint64, txID string, rws ReadWrit
 			TxID:      txID,
 			Key:       w.Key,
 			Value:     w.Value,
-			IsDelete:  w.IsDelete,
 		}
 	}
 	return rec

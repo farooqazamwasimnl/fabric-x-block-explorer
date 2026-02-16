@@ -119,7 +119,6 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 			TxID:        []byte(w.TxID),
 			Key:         []byte(w.Key),
 			Value:       w.Value,
-			IsDelete:    w.IsDelete,
 		}); err != nil {
 			return err
 		}

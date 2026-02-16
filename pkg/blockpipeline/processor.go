@@ -19,16 +19,6 @@ import (
 // BlockProcessor reads raw blocks from 'in', processes them and sends
 // processed blocks to 'out'. Any fatal error is reported on errCh.
 func BlockProcessor(ctx context.Context, in <-chan *common.Block, out chan<- *types.ProcessedBlock, errCh chan<- error) {
-	// Recover from panics and report them to errCh.
-	defer func() {
-		if r := recover(); r != nil {
-			errCh <- fmt.Errorf("blockProcessor panic: %v", r)
-		}
-	}()
-
-	// close the output channel when this processor exits.
-	defer close(out)
-
 	log.Println("blockProcessor started")
 
 	for {

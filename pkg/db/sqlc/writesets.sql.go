@@ -10,7 +10,7 @@ import (
 )
 
 const getWritesByTx = `-- name: GetWritesByTx :many
-SELECT id, namespace_id, block_num, tx_num, tx_id, key, value, is_delete
+SELECT id, namespace_id, block_num, tx_num, tx_id, key, value
 FROM writesets
 WHERE block_num = $1 AND tx_num = $2
 ORDER BY id
@@ -46,7 +46,6 @@ func (q *Queries) GetWritesByTx(ctx context.Context, arg GetWritesByTxParams) ([
 			&i.TxID,
 			&i.Key,
 			&i.Value,
-			&i.IsDelete,
 		); err != nil {
 			return nil, err
 		}
@@ -63,8 +62,8 @@ func (q *Queries) GetWritesByTx(ctx context.Context, arg GetWritesByTxParams) ([
 
 const insertWrite = `-- name: InsertWrite :exec
 INSERT INTO writesets
-(namespace_id, block_num, tx_num, tx_id, key, value, is_delete)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+(namespace_id, block_num, tx_num, tx_id, key, value)
+VALUES ($1, $2, $3, $4, $5, $6)
 `
 
 type InsertWriteParams struct {
@@ -74,7 +73,6 @@ type InsertWriteParams struct {
 	TxID        []byte `json:"tx_id"`
 	Key         []byte `json:"key"`
 	Value       []byte `json:"value"`
-	IsDelete    bool   `json:"is_delete"`
 }
 
 func (q *Queries) InsertWrite(ctx context.Context, arg InsertWriteParams) error {
@@ -85,7 +83,6 @@ func (q *Queries) InsertWrite(ctx context.Context, arg InsertWriteParams) error 
 		arg.TxID,
 		arg.Key,
 		arg.Value,
-		arg.IsDelete,
 	)
 	return err
 }

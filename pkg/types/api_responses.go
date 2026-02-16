@@ -35,7 +35,6 @@ type WriteRecordResponse struct {
 	TxID        string `json:"tx_id"`
 	Key         string `json:"key"`
 	Value       string `json:"value"`
-	IsDelete    bool   `json:"is_delete"`
 }
 
 type TxWithBlockResponse struct {

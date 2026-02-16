@@ -32,5 +32,4 @@ type Writeset struct {
 	TxID        []byte `json:"tx_id"`
 	Key         []byte `json:"key"`
 	Value       []byte `json:"value"`
-	IsDelete    bool   `json:"is_delete"`
 }

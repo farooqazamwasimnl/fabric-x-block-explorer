@@ -26,6 +26,5 @@ CREATE TABLE IF NOT EXISTS writesets (
     tx_num BIGINT NOT NULL,
     tx_id BYTEA NOT NULL,   
     key BYTEA NOT NULL,     
-    value BYTEA,            
-    is_delete BOOLEAN NOT NULL
+    value BYTEA
 );
