@@ -34,7 +34,7 @@ func NewAPI(db *sql.DB) *API {
 }
 
 // writeJSON writes v as JSON to the ResponseWriter and sets Content-Type.
-func writeJSON(w http.ResponseWriter, v interface{}) {
+func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(v)
 }
@@ -57,7 +57,7 @@ func (a *API) GetBlockHeight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// sqlc returns interface{} because of COALESCE
+	// sqlc returns any because of COALESCE
 	h := height.(int64)
 
 	writeJSON(w, map[string]int64{"height": h})

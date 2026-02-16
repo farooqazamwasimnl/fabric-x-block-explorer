@@ -1,0 +1,37 @@
+# Fabric Block Explorer Configuration
+# This file is optional. If not present, environment variables will be used.
+# Environment variables override settings in this file.
+
+# Database configuration
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+  dbname: explorer
+  sslmode: disable
+
+# Sidecar (Fabric Block Source) configuration
+sidecar:
+  host: localhost
+  port: 4001
+  channel_id: mychannel
+  start_block: 0
+  end_block: 18446744073709551615  # max uint64
+
+# Buffer/Channel sizes for block processing pipeline
+buffer:
+  raw_channel_size: 200
+  process_channel_size: 200
+  receiver_channel_size: 200
+
+# Worker pool configuration
+workers:
+  processor_count: 10
+  writer_count: 10
+
+# HTTP Server configuration
+server:
+  http_addr: ":8080"
+  shutdown_timeout_sec: 10
+  writer_wait_timeout_sec: 15

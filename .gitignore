@@ -1,1 +1,19 @@
 .DS_Store
+
+# Configuration
+config.yaml
+
+# Binaries
+explorer
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build artifacts
+/bin/
+/dist/
+
+# Temporary files
+*.tmp
+*.log

@@ -12,6 +12,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/sidecarstream"
 	"github.com/hyperledger/fabric-protos-go-apiv2/common"
 )
@@ -28,7 +29,7 @@ func BlockReceiver(ctx context.Context, streamer *sidecarstream.Streamer, out ch
 	}()
 
 	log.Println("blockReceiver started")
-	backoff := NewBackoff()
+	backoffObj := NewBackoff()
 
 	for {
 		// Stop immediately if context is cancelled.
@@ -45,7 +46,7 @@ func BlockReceiver(ctx context.Context, streamer *sidecarstream.Streamer, out ch
 
 		log.Println("blockreceiver: starting Sidecar stream")
 		streamer.StartDeliver(ctx, blockCh)
-		backoff.Reset()
+		backoffObj.Reset()
 
 		// Consume blocks from blockCh and forward to out.
 		if err := consumeBlocks(ctx, blockCh, out); err != nil {
@@ -53,7 +54,10 @@ func BlockReceiver(ctx context.Context, streamer *sidecarstream.Streamer, out ch
 		}
 
 		// Reconnect with backoff delay.
-		wait := backoff.Next()
+		wait := backoffObj.NextBackOff()
+		if wait == backoff.Stop {
+			wait = 30 * time.Second
+		}
 		log.Printf("blockreceiver: reconnecting after %v", wait)
 
 		select {

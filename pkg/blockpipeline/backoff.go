@@ -7,35 +7,17 @@ SPDX-License-Identifier: Apache-2.0
 package blockpipeline
 
 import (
-	"math"
-	"math/rand"
 	"time"
+
+	"github.com/cenkalti/backoff/v4"
 )
 
-type Backoff struct {
-	base     time.Duration
-	max      time.Duration
-	attempts int
-}
-
-func NewBackoff() *Backoff {
-	return &Backoff{
-		base: 500 * time.Millisecond,
-		max:  30 * time.Second,
-	}
-}
-
-func (b *Backoff) Reset() {
-	b.attempts = 0
-}
-
-func (b *Backoff) Next() time.Duration {
-	exp := float64(b.base) * math.Pow(2, float64(b.attempts))
-	if exp > float64(b.max) {
-		exp = float64(b.max)
-	}
-	b.attempts++
-
-	jitter := rand.Float64()*0.3 + 0.85 // 0.85–1.15
-	return time.Duration(exp * jitter)
+// NewBackoff creates a new exponential backoff with jitter.
+// Base: 500ms, Max: 30s, with exponential multiplier.
+func NewBackoff() backoff.BackOff {
+	eb := backoff.NewExponentialBackOff()
+	eb.InitialInterval = 500 * time.Millisecond
+	eb.MaxInterval = 30 * time.Second
+	eb.MaxElapsedTime = 0 // no timeout
+	return eb
 }

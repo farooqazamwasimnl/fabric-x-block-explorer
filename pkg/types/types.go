@@ -9,7 +9,7 @@ package types
 type ProcessedBlock struct {
 	Number    uint64
 	Txns      int
-	Data      interface{}
+	Data      any
 	BlockInfo *BlockInfo
 }
 

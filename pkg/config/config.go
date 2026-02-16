@@ -9,91 +9,185 @@ package config
 import (
 	"os"
 	"strconv"
+
+	"gopkg.in/yaml.v3"
 )
 
 type DBConfig struct {
-	Host     string
-	Port     int
-	User     string
-	Password string
-	DBName   string
-	SSLMode  string
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	DBName   string `yaml:"dbname"`
+	SSLMode  string `yaml:"sslmode"`
 }
 
 type SidecarConfig struct {
-	Host      string
-	Port      int
-	ChannelID string
-	StartBlk  uint64
-	EndBlk    uint64
+	Host      string `yaml:"host"`
+	Port      int    `yaml:"port"`
+	ChannelID string `yaml:"channel_id"`
+	StartBlk  uint64 `yaml:"start_block"`
+	EndBlk    uint64 `yaml:"end_block"`
 }
 
 type BufferConfig struct {
-	RawChannelSize      int
-	ProcessChannelSize  int
-	ReceiverChannelSize int
+	RawChannelSize      int `yaml:"raw_channel_size"`
+	ProcessChannelSize  int `yaml:"process_channel_size"`
+	ReceiverChannelSize int `yaml:"receiver_channel_size"`
 }
 
 type WorkerConfig struct {
-	ProcessorCount int
-	WriterCount    int
+	ProcessorCount int `yaml:"processor_count"`
+	WriterCount    int `yaml:"writer_count"`
 }
 
 type ServerConfig struct {
-	HTTPAddr             string
-	ShutdownTimeoutSec   int
-	WriterWaitTimeoutSec int
+	HTTPAddr             string `yaml:"http_addr"`
+	ShutdownTimeoutSec   int    `yaml:"shutdown_timeout_sec"`
+	WriterWaitTimeoutSec int    `yaml:"writer_wait_timeout_sec"`
 }
 
 type Config struct {
-	DB      DBConfig
-	Sidecar SidecarConfig
-	Buffer  BufferConfig
-	Workers WorkerConfig
-	Server  ServerConfig
+	DB      DBConfig    `yaml:"database"`
+	Sidecar SidecarConfig `yaml:"sidecar"`
+	Buffer  BufferConfig `yaml:"buffer"`
+	Workers WorkerConfig `yaml:"workers"`
+	Server  ServerConfig `yaml:"server"`
 }
 
-// Load reads configuration from environment variables and returns a Config.
+// Load reads configuration from config.yaml if it exists, otherwise from environment variables.
+// Environment variables override YAML file settings.
 func Load() (*Config, error) {
-	cfg := &Config{}
+	var cfg *Config
 
-	// Database config
-	cfg.DB = DBConfig{
-		Host:     getEnv("DB_HOST", "localhost"),
-		Port:     getInt("DB_PORT", 5432),
-		User:     getEnv("DB_USER", "postgres"),
-		Password: getEnv("DB_PASSWORD", "postgres"),
-		DBName:   getEnv("DB_NAME", "explorer"),
-		SSLMode:  getEnv("DB_SSLMODE", "disable"),
+	// Try to load from YAML first
+	yamlPath := "config.yaml"
+	if _, err := os.Stat(yamlPath); err == nil {
+		var err error
+		cfg, err = LoadConfigFromYAML(yamlPath)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// No YAML file, use environment variables
+		cfg = &Config{}
+	}
+
+	// Override with environment variables
+	if v := getEnv("DB_HOST", ""); v != "" {
+		cfg.DB.Host = v
+	} else if cfg.DB.Host == "" {
+		cfg.DB.Host = "localhost"
+	}
+
+	if v := getInt("DB_PORT", -1); v != -1 {
+		cfg.DB.Port = v
+	} else if cfg.DB.Port == 0 {
+		cfg.DB.Port = 5432
+	}
+
+	if v := getEnv("DB_USER", ""); v != "" {
+		cfg.DB.User = v
+	} else if cfg.DB.User == "" {
+		cfg.DB.User = "postgres"
+	}
+
+	if v := getEnv("DB_PASSWORD", ""); v != "" {
+		cfg.DB.Password = v
+	} else if cfg.DB.Password == "" {
+		cfg.DB.Password = "postgres"
+	}
+
+	if v := getEnv("DB_NAME", ""); v != "" {
+		cfg.DB.DBName = v
+	} else if cfg.DB.DBName == "" {
+		cfg.DB.DBName = "explorer"
+	}
+
+	if v := getEnv("DB_SSLMODE", ""); v != "" {
+		cfg.DB.SSLMode = v
+	} else if cfg.DB.SSLMode == "" {
+		cfg.DB.SSLMode = "disable"
 	}
 
 	// Sidecar config
-	cfg.Sidecar = SidecarConfig{
-		Host:      getEnv("SIDECAR_HOST", "localhost"),
-		Port:      getInt("SIDECAR_PORT", 4001),
-		ChannelID: getEnv("SIDECAR_CHANNEL", "mychannel"),
-		StartBlk:  getUint("SIDECAR_START_BLOCK", 0),
-		EndBlk:    getUint("SIDECAR_END_BLOCK", ^uint64(0)),
+	if v := getEnv("SIDECAR_HOST", ""); v != "" {
+		cfg.Sidecar.Host = v
+	} else if cfg.Sidecar.Host == "" {
+		cfg.Sidecar.Host = "localhost"
 	}
 
-	// Buffer sizes for channels
-	cfg.Buffer = BufferConfig{
-		RawChannelSize:      getInt("RAW_CHANNEL_SIZE", 200),
-		ProcessChannelSize:  getInt("PROCESS_CHANNEL_SIZE", 200),
-		ReceiverChannelSize: getInt("RECEIVER_CHANNEL_SIZE", 200),
+	if v := getInt("SIDECAR_PORT", -1); v != -1 {
+		cfg.Sidecar.Port = v
+	} else if cfg.Sidecar.Port == 0 {
+		cfg.Sidecar.Port = 4001
 	}
 
-	// Worker pool sizes
-	cfg.Workers = WorkerConfig{
-		ProcessorCount: getInt("PROCESS_WORKERS", 10),
-		WriterCount:    getInt("WRITE_WORKERS", 10),
+	if v := getEnv("SIDECAR_CHANNEL", ""); v != "" {
+		cfg.Sidecar.ChannelID = v
+	} else if cfg.Sidecar.ChannelID == "" {
+		cfg.Sidecar.ChannelID = "mychannel"
 	}
 
-	// Server settings (configurable)
-	cfg.Server = ServerConfig{
-		HTTPAddr:             getEnv("HTTP_ADDR", ":8080"),
-		ShutdownTimeoutSec:   getInt("HTTP_SHUTDOWN_TIMEOUT_SEC", 10),
-		WriterWaitTimeoutSec: getInt("WRITER_WAIT_TIMEOUT_SEC", 15),
+	if v := getUint("SIDECAR_START_BLOCK", ^uint64(0)); v != ^uint64(0) {
+		cfg.Sidecar.StartBlk = v
+	}
+
+	if v := getUint("SIDECAR_END_BLOCK", ^uint64(0)); v != ^uint64(0) {
+		cfg.Sidecar.EndBlk = v
+	} else if cfg.Sidecar.EndBlk == 0 {
+		cfg.Sidecar.EndBlk = ^uint64(0)
+	}
+
+	// Buffer config
+	if v := getInt("RAW_CHANNEL_SIZE", -1); v != -1 {
+		cfg.Buffer.RawChannelSize = v
+	} else if cfg.Buffer.RawChannelSize == 0 {
+		cfg.Buffer.RawChannelSize = 200
+	}
+
+	if v := getInt("PROCESS_CHANNEL_SIZE", -1); v != -1 {
+		cfg.Buffer.ProcessChannelSize = v
+	} else if cfg.Buffer.ProcessChannelSize == 0 {
+		cfg.Buffer.ProcessChannelSize = 200
+	}
+
+	if v := getInt("RECEIVER_CHANNEL_SIZE", -1); v != -1 {
+		cfg.Buffer.ReceiverChannelSize = v
+	} else if cfg.Buffer.ReceiverChannelSize == 0 {
+		cfg.Buffer.ReceiverChannelSize = 200
+	}
+
+	// Workers config
+	if v := getInt("PROCESS_WORKERS", -1); v != -1 {
+		cfg.Workers.ProcessorCount = v
+	} else if cfg.Workers.ProcessorCount == 0 {
+		cfg.Workers.ProcessorCount = 10
+	}
+
+	if v := getInt("WRITE_WORKERS", -1); v != -1 {
+		cfg.Workers.WriterCount = v
+	} else if cfg.Workers.WriterCount == 0 {
+		cfg.Workers.WriterCount = 10
+	}
+
+	// Server config
+	if v := getEnv("HTTP_ADDR", ""); v != "" {
+		cfg.Server.HTTPAddr = v
+	} else if cfg.Server.HTTPAddr == "" {
+		cfg.Server.HTTPAddr = ":8080"
+	}
+
+	if v := getInt("HTTP_SHUTDOWN_TIMEOUT_SEC", -1); v != -1 {
+		cfg.Server.ShutdownTimeoutSec = v
+	} else if cfg.Server.ShutdownTimeoutSec == 0 {
+		cfg.Server.ShutdownTimeoutSec = 10
+	}
+
+	if v := getInt("WRITER_WAIT_TIMEOUT_SEC", -1); v != -1 {
+		cfg.Server.WriterWaitTimeoutSec = v
+	} else if cfg.Server.WriterWaitTimeoutSec == 0 {
+		cfg.Server.WriterWaitTimeoutSec = 15
 	}
 
 	// Basic validation / sane defaults
@@ -117,6 +211,21 @@ func Load() (*Config, error) {
 	}
 	if cfg.Server.HTTPAddr == "" {
 		cfg.Server.HTTPAddr = ":8080"
+	}
+
+	return cfg, nil
+}
+
+// LoadConfigFromYAML loads configuration from a YAML file.
+func LoadConfigFromYAML(filePath string) (*Config, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := &Config{}
+	if err := yaml.Unmarshal(data, cfg); err != nil {
+		return nil, err
 	}
 
 	return cfg, nil
