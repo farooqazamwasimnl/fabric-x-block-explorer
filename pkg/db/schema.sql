@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS blocks (
     block_num BIGINT PRIMARY KEY,
     tx_count INT NOT NULL,
-    previous_hash BYTEA NOT NULL,
-    data_hash BYTEA NOT NULL
+    previous_hash BYTEA,
+    data_hash BYTEA
 );
 
 CREATE TABLE IF NOT EXISTS transactions (

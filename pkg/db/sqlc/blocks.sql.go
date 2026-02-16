@@ -16,7 +16,7 @@ WHERE block_num = $1
 `
 
 func (q *Queries) GetBlock(ctx context.Context, blockNum int64) (Block, error) {
-	row := q.db.QueryRowContext(ctx, getBlock, blockNum)
+	row := q.db.QueryRow(ctx, getBlock, blockNum)
 	var i Block
 	err := row.Scan(
 		&i.BlockNum,
@@ -33,7 +33,7 @@ FROM blocks
 `
 
 func (q *Queries) GetBlockHeight(ctx context.Context) (interface{}, error) {
-	row := q.db.QueryRowContext(ctx, getBlockHeight)
+	row := q.db.QueryRow(ctx, getBlockHeight)
 	var height interface{}
 	err := row.Scan(&height)
 	return height, err
@@ -53,7 +53,7 @@ type InsertBlockParams struct {
 }
 
 func (q *Queries) InsertBlock(ctx context.Context, arg InsertBlockParams) error {
-	_, err := q.db.ExecContext(ctx, insertBlock,
+	_, err := q.db.Exec(ctx, insertBlock,
 		arg.BlockNum,
 		arg.TxCount,
 		arg.PreviousHash,

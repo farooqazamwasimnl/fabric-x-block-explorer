@@ -36,7 +36,6 @@ func BlockReceiver(ctx context.Context, streamer *sidecarstream.Streamer, out ch
 		select {
 		case <-ctx.Done():
 			log.Println("blockreceiver stopping")
-			close(out)
 			return
 		default:
 		}
@@ -63,7 +62,6 @@ func BlockReceiver(ctx context.Context, streamer *sidecarstream.Streamer, out ch
 		select {
 		case <-ctx.Done():
 			log.Println("blockreceiver stopping before reconnect")
-			close(out)
 			return
 		case <-time.After(wait):
 			// loop and try again

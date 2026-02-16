@@ -8,28 +8,28 @@ package api
 
 import (
 	"context"
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	dbsqlc "github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/db/sqlc"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/types"
 )
 
 // API exposes database-backed HTTP handlers.
 type API struct {
-	q  *dbsqlc.Queries
-	db *sql.DB
+	q    *dbsqlc.Queries
+	pool *pgxpool.Pool
 }
 
-// NewAPI constructs an API instance from a *sql.DB.
-func NewAPI(db *sql.DB) *API {
+// NewAPI constructs an API instance from a *pgxpool.Pool.
+func NewAPI(pool *pgxpool.Pool) *API {
 	return &API{
-		q:  dbsqlc.New(db),
-		db: db,
+		q:    dbsqlc.New(pool),
+		pool: pool,
 	}
 }
 
@@ -238,12 +238,12 @@ type HealthResponse struct {
 func (a *API) HealthHandler(w http.ResponseWriter, r *http.Request) {
 	// Liveness: process is alive if this handler runs.
 	// Readiness: check DB connectivity with a short timeout.
-	ctx, cancel := context.WithTimeout(r.Context(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	// If API has a DB handle, try pinging it. If not, treat as ready.
-	if a.db != nil {
-		if err := a.db.PingContext(ctx); err != nil {
+	// If API has a pool handle, try pinging it. If not, treat as ready.
+	if a.pool != nil {
+		if err := a.pool.Ping(ctx); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			writeJSON(w, HealthResponse{
 				Status:  "unavailable",

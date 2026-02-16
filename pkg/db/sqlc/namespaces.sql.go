@@ -17,7 +17,7 @@ RETURNING id
 `
 
 func (q *Queries) UpsertNamespace(ctx context.Context, name []byte) (int64, error) {
-	row := q.db.QueryRowContext(ctx, upsertNamespace, name)
+	row := q.db.QueryRow(ctx, upsertNamespace, name)
 	var id int64
 	err := row.Scan(&id)
 	return id, err

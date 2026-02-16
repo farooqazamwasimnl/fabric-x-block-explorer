@@ -7,12 +7,11 @@ SPDX-License-Identifier: Apache-2.0
 package db
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
-	_ "github.com/lib/pq"
+	
+	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-var DB *sql.DB
 
 type Config struct {
 	Host     string
@@ -23,41 +22,31 @@ type Config struct {
 	SSLMode  string
 }
 
-// NewPostgres opens a *sql.DB using the given config.
-// It opens the connection and verifies it with Ping().
-func NewPostgres(cfg Config) (*sql.DB, error) {
+// NewPostgres creates a new pgx connection pool using the given config.
+func NewPostgres(cfg Config) (*pgxpool.Pool, error) {
 	if cfg.SSLMode == "" {
 		cfg.SSLMode = "disable"
 	}
 
 	dsn := fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		cfg.Host,
-		cfg.Port,
+		"postgres://%s:%s@%s:%d/%s?sslmode=%s&pool_max_conns=20",
 		cfg.User,
 		cfg.Password,
+		cfg.Host,
+		cfg.Port,
 		cfg.DBName,
 		cfg.SSLMode,
 	)
 
-	db, err := sql.Open("postgres", dsn)
+	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open postgres: %w", err)
+		return nil, fmt.Errorf("failed to create pgx pool: %w", err)
 	}
 
-	if err := db.Ping(); err != nil {
-		_ = db.Close()
+	if err := pool.Ping(context.Background()); err != nil {
+		pool.Close()
 		return nil, fmt.Errorf("failed to connect postgres: %w", err)
 	}
 
-	return db, nil
-}
-
-func InitPostgres(conn string) error {
-	var err error
-	DB, err = sql.Open("postgres", conn)
-	if err != nil {
-		return err
-	}
-	return DB.Ping()
+	return pool, nil
 }

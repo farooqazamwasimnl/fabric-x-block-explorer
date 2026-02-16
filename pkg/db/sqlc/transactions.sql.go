@@ -16,7 +16,7 @@ WHERE tx_id = $1
 `
 
 func (q *Queries) GetTransactionByTxID(ctx context.Context, txID []byte) (Transaction, error) {
-	row := q.db.QueryRowContext(ctx, getTransactionByTxID, txID)
+	row := q.db.QueryRow(ctx, getTransactionByTxID, txID)
 	var i Transaction
 	err := row.Scan(
 		&i.ID,
@@ -43,7 +43,7 @@ type GetTransactionsByBlockParams struct {
 }
 
 func (q *Queries) GetTransactionsByBlock(ctx context.Context, arg GetTransactionsByBlockParams) ([]Transaction, error) {
-	rows, err := q.db.QueryContext(ctx, getTransactionsByBlock, arg.BlockNum, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, getTransactionsByBlock, arg.BlockNum, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -61,9 +61,6 @@ func (q *Queries) GetTransactionsByBlock(ctx context.Context, arg GetTransaction
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -85,7 +82,7 @@ type InsertTransactionParams struct {
 }
 
 func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionParams) error {
-	_, err := q.db.ExecContext(ctx, insertTransaction,
+	_, err := q.db.Exec(ctx, insertTransaction,
 		arg.BlockNum,
 		arg.TxNum,
 		arg.TxID,

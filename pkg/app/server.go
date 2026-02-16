@@ -8,11 +8,11 @@ package app
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"net/http"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/api"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/config"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/db"
@@ -23,7 +23,7 @@ import (
 // Server manages the block explorer application components.
 type Server struct {
 	config     *config.Config
-	db         *sql.DB
+	pool       *pgxpool.Pool
 	apiServer  *api.API
 	httpServer *http.Server
 	streamer   *sidecarstream.Streamer
@@ -33,7 +33,7 @@ type Server struct {
 // New creates a new Server instance.
 func New(cfg *config.Config) (*Server, error) {
 	// Initialize database
-	sqlDB, err := db.NewPostgres(db.Config{
+	pool, err := db.NewPostgres(db.Config{
 		Host:     cfg.DB.Host,
 		Port:     cfg.DB.Port,
 		User:     cfg.DB.User,
@@ -46,7 +46,7 @@ func New(cfg *config.Config) (*Server, error) {
 	}
 
 	// Create API server
-	apiServer := api.NewAPI(sqlDB)
+	apiServer := api.NewAPI(pool)
 
 	// Create HTTP server
 	httpServer := &http.Server{
@@ -67,7 +67,7 @@ func New(cfg *config.Config) (*Server, error) {
 	// Create sidecar streamer
 	streamer, err := sidecarstream.NewStreamer(cfg.Sidecar)
 	if err != nil {
-		_ = sqlDB.Close()
+		pool.Close()
 		return nil, err
 	}
 
@@ -78,11 +78,11 @@ func New(cfg *config.Config) (*Server, error) {
 		RawBuf:         cfg.Buffer.RawChannelSize,
 		ProcBuf:        cfg.Buffer.ProcessChannelSize,
 	}
-	wp := workerpool.New(wpCfg, sqlDB, streamer)
+	wp := workerpool.New(wpCfg, pool, streamer)
 
 	return &Server{
 		config:     cfg,
-		db:         sqlDB,
+		pool:       pool,
 		apiServer:  apiServer,
 		httpServer: httpServer,
 		streamer:   streamer,
@@ -150,9 +150,7 @@ func (s *Server) Shutdown() error {
 	}
 
 	// Database cleanup
-	if err := s.db.Close(); err != nil {
-		log.Printf("database close error: %v", err)
-	}
+	s.pool.Close()
 
 	return nil
 }

@@ -8,30 +8,31 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	dbsqlc "github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/db/sqlc"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/types"
 )
 
 // BlockWriter writes processed blocks and their writes/transactions to the DB.
-// It supports being constructed from either a *sql.DB (shared pool) or a
-// dedicated *sql.Conn (per-writer dedicated connection).
+// It supports being constructed from either a *pgxpool.Pool (shared pool) or a
+// dedicated *pgxpool.Conn (per-writer dedicated connection).
 type BlockWriter struct {
-	db   *sql.DB
-	conn *sql.Conn
+	pool *pgxpool.Pool
+	conn *pgxpool.Conn
 }
 
-// NewBlockWriter constructs a BlockWriter that uses the provided *sql.DB.
-func NewBlockWriter(db *sql.DB) *BlockWriter {
-	return &BlockWriter{db: db}
+// NewBlockWriter constructs a BlockWriter that uses the provided *pgxpool.Pool.
+func NewBlockWriter(pool *pgxpool.Pool) *BlockWriter {
+	return &BlockWriter{pool: pool}
 }
 
-// NewBlockWriterFromConn constructs a BlockWriter that uses the provided *sql.Conn.
+// NewBlockWriterFromConn constructs a BlockWriter that uses the provided *pgxpool.Conn.
 // This is useful when each writer goroutine should use its own dedicated DB connection.
-func NewBlockWriterFromConn(conn *sql.Conn) *BlockWriter {
+func NewBlockWriterFromConn(conn *pgxpool.Conn) *BlockWriter {
 	return &BlockWriter{conn: conn}
 }
 
@@ -51,15 +52,15 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 
 	// Choose where to begin a transaction: prefer dedicated conn if present.
 	var (
-		tx  *sql.Tx
+		tx  pgx.Tx
 		err error
 	)
 	if bw.conn != nil {
-		tx, err = bw.conn.BeginTx(ctx, nil)
-	} else if bw.db != nil {
-		tx, err = bw.db.BeginTx(ctx, nil)
+		tx, err = bw.conn.Begin(ctx)
+	} else if bw.pool != nil {
+		tx, err = bw.pool.Begin(ctx)
 	} else {
-		return errors.New("no db or conn available in BlockWriter")
+		return errors.New("no pool or conn available in BlockWriter")
 	}
 	if err != nil {
 		return err
@@ -69,7 +70,7 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 	committed := false
 	defer func() {
 		if !committed {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}
 	}()
 
@@ -125,7 +126,7 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 	}
 
 	// Commit transaction
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
 	committed = true

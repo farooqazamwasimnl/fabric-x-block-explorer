@@ -8,11 +8,11 @@ package workerpool
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/blockpipeline"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/db"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/sidecarstream"
@@ -34,12 +34,12 @@ type Pool struct {
 	cfg      Config
 	rawCh    chan *common.Block
 	procCh   chan *types.ProcessedBlock
-	sqlDB    *sql.DB
+	pool     *pgxpool.Pool
 	streamer *sidecarstream.Streamer
 }
 
-// New constructs a Pool. sqlDB and streamer are injected.
-func New(cfg Config, sqlDB *sql.DB, streamer *sidecarstream.Streamer) *Pool {
+// New constructs a Pool. pool and streamer are injected.
+func New(cfg Config, pool *pgxpool.Pool, streamer *sidecarstream.Streamer) *Pool {
 	// sensible defaults
 	if cfg.RawBuf <= 0 {
 		cfg.RawBuf = 64
@@ -58,7 +58,7 @@ func New(cfg Config, sqlDB *sql.DB, streamer *sidecarstream.Streamer) *Pool {
 		cfg:      cfg,
 		rawCh:    make(chan *common.Block, cfg.RawBuf),
 		procCh:   make(chan *types.ProcessedBlock, cfg.ProcBuf),
-		sqlDB:    sqlDB,
+		pool:     pool,
 		streamer: streamer,
 	}
 }
@@ -101,15 +101,13 @@ func (p *Pool) Start(ctx context.Context, errCh chan<- error) *errgroup.Group {
 		return nil
 	})
 
-	// Writers: spawn writerCount writers. Each writer uses its own sql.Conn.
+	// Writers: spawn writerCount writers. Each writer uses its own pgxpool.Conn.
 	for i := 0; i < p.cfg.WriterCount; i++ {
 		workerID := i
 		g.Go(func() error {
 			log.Printf("writer[%d] started", workerID)
 			// Acquire a dedicated connection for this writer
-			connCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-			defer cancel()
-			conn, err := p.sqlDB.Conn(connCtx)
+			conn, err := p.pool.Acquire(context.Background())
 			if err != nil {
 				select {
 				case errCh <- err:
@@ -118,7 +116,7 @@ func (p *Pool) Start(ctx context.Context, errCh chan<- error) *errgroup.Group {
 				return err
 			}
 			defer func() {
-				_ = conn.Close()
+				conn.Release()
 			}()
 
 			// Create a per-connection BlockWriter.

@@ -25,7 +25,7 @@ type GetWritesByTxParams struct {
 }
 
 func (q *Queries) GetWritesByTx(ctx context.Context, arg GetWritesByTxParams) ([]Writeset, error) {
-	rows, err := q.db.QueryContext(ctx, getWritesByTx,
+	rows, err := q.db.Query(ctx, getWritesByTx,
 		arg.BlockNum,
 		arg.TxNum,
 		arg.Limit,
@@ -51,9 +51,6 @@ func (q *Queries) GetWritesByTx(ctx context.Context, arg GetWritesByTxParams) ([
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -76,7 +73,7 @@ type InsertWriteParams struct {
 }
 
 func (q *Queries) InsertWrite(ctx context.Context, arg InsertWriteParams) error {
-	_, err := q.db.ExecContext(ctx, insertWrite,
+	_, err := q.db.Exec(ctx, insertWrite,
 		arg.NamespaceID,
 		arg.BlockNum,
 		arg.TxNum,
