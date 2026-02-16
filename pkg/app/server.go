@@ -9,15 +9,18 @@ package app
 import (
 	"context"
 	"log"
+	"net"
 	"net/http"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/api"
+	pb "github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/api/proto"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/config"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/db"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/sidecarstream"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/workerpool"
+	"google.golang.org/grpc"
 )
 
 // Server manages the block explorer application components.
@@ -26,6 +29,7 @@ type Server struct {
 	pool       *pgxpool.Pool
 	apiServer  *api.API
 	httpServer *http.Server
+	grpcServer *grpc.Server
 	streamer   *sidecarstream.Streamer
 	workerPool *workerpool.Pool
 }
@@ -53,6 +57,11 @@ func New(cfg *config.Config) (*Server, error) {
 		Addr:    cfg.Server.HTTPAddr,
 		Handler: apiServer.Router(),
 	}
+
+	// Create gRPC server
+	grpcServer := grpc.NewServer()
+	grpcHandler := api.NewGRPCServer(apiServer)
+	pb.RegisterBlockExplorerServer(grpcServer, grpcHandler)
 
 	// Query current block height and adjust sidecar start block if needed
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -85,6 +94,7 @@ func New(cfg *config.Config) (*Server, error) {
 		pool:       pool,
 		apiServer:  apiServer,
 		httpServer: httpServer,
+		grpcServer: grpcServer,
 		streamer:   streamer,
 		workerPool: wp,
 	}, nil
@@ -94,6 +104,8 @@ func New(cfg *config.Config) (*Server, error) {
 func (s *Server) Run(ctx context.Context) error {
 	// HTTP server errors
 	httpErrCh := make(chan error, 1)
+	// gRPC server errors
+	grpcErrCh := make(chan error, 1)
 
 	// Start HTTP server
 	go func() {
@@ -101,6 +113,25 @@ func (s *Server) Run(ctx context.Context) error {
 		if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			select {
 			case httpErrCh <- err:
+			default:
+			}
+		}
+	}()
+
+	// Start gRPC server
+	go func() {
+		lis, err := net.Listen("tcp", s.config.Server.GRPCAddr)
+		if err != nil {
+			select {
+			case grpcErrCh <- err:
+			default:
+			}
+			return
+		}
+		log.Printf("gRPC API running on %s", s.config.Server.GRPCAddr)
+		if err := s.grpcServer.Serve(lis); err != nil {
+			select {
+			case grpcErrCh <- err:
 			default:
 			}
 		}
@@ -114,7 +145,9 @@ func (s *Server) Run(ctx context.Context) error {
 	case <-ctx.Done():
 		log.Println("shutdown requested")
 	case err := <-httpErrCh:
-		log.Printf("fatal error: %v", err)
+		log.Printf("fatal HTTP error: %v", err)
+	case err := <-grpcErrCh:
+		log.Printf("fatal gRPC error: %v", err)
 	}
 
 	// Graceful shutdown
@@ -134,6 +167,11 @@ func (s *Server) Run(ctx context.Context) error {
 
 // Shutdown gracefully shuts down the server components.
 func (s *Server) Shutdown() error {
+	// gRPC server shutdown
+	log.Println("shutting down gRPC server...")
+	s.grpcServer.GracefulStop()
+	log.Println("gRPC server shutdown complete")
+
 	// HTTP server shutdown
 	shutdownTimeout := time.Duration(s.config.Server.ShutdownTimeoutSec) * time.Second
 	if shutdownTimeout <= 0 {

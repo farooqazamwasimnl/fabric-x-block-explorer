@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package explorer;
+
+option go_package = "github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/api/proto";
+
+// BlockExplorer service provides APIs to query blockchain data
+service BlockExplorer {
+  // GetBlockHeight returns the current block height
+  rpc GetBlockHeight(BlockHeightRequest) returns (BlockHeightResponse);
+  
+  // GetBlock returns block details by block number
+  rpc GetBlock(GetBlockRequest) returns (BlockResponse);
+  
+  // GetTransaction returns transaction details by transaction ID
+  rpc GetTransaction(GetTransactionRequest) returns (TransactionResponse);
+  
+  // HealthCheck returns service health status
+  rpc HealthCheck(HealthRequest) returns (HealthResponse);
+}
+
+// BlockHeightRequest - empty request
+message BlockHeightRequest {}
+
+// BlockHeightResponse contains the current block height
+message BlockHeightResponse {
+  int64 height = 1;
+}
+
+// GetBlockRequest to fetch a block by number
+message GetBlockRequest {
+  int64 block_num = 1;
+  int32 limit_tx = 2;       // max transactions to return
+  int32 offset_tx = 3;      // transaction offset
+  int32 limit_writes = 4;   // max writes per transaction
+  int32 offset_writes = 5;  // write offset
+}
+
+// BlockResponse contains block details
+message BlockResponse {
+  int64 block_num = 1;
+  int32 tx_count = 2;
+  string previous_hash = 3;
+  string data_hash = 4;
+  repeated TransactionWithWrites transactions = 5;
+}
+
+// TransactionWithWrites contains transaction and its write sets
+message TransactionWithWrites {
+  int64 id = 1;
+  int64 block_num = 2;
+  int64 tx_num = 3;
+  string tx_id = 4;
+  int64 validation_code = 5;
+  repeated WriteRecord writes = 6;
+}
+
+// WriteRecord contains a single write record
+message WriteRecord {
+  int64 id = 1;
+  int64 namespace_id = 2;
+  int64 block_num = 3;
+  int64 tx_num = 4;
+  string tx_id = 5;
+  string key = 6;
+  string value = 7;
+}
+
+// GetTransactionRequest to fetch transaction by ID
+message GetTransactionRequest {
+  string tx_id = 1; // hex encoded transaction ID
+}
+
+// TransactionResponse contains transaction with block context
+message TransactionResponse {
+  TransactionWithWrites transaction = 1;
+  BlockHeader block = 2;
+}
+
+// BlockHeader contains basic block information
+message BlockHeader {
+  int64 block_num = 1;
+  int32 tx_count = 2;
+  string previous_hash = 3;
+  string data_hash = 4;
+}
+
+// HealthRequest - empty request
+message HealthRequest {}
+
+// HealthResponse contains service health status
+message HealthResponse {
+  string status = 1;
+  string details = 2;
+}

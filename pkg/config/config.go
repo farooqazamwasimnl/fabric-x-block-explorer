@@ -43,6 +43,7 @@ type WorkerConfig struct {
 
 type ServerConfig struct {
 	HTTPAddr             string `yaml:"http_addr"`
+	GRPCAddr             string `yaml:"grpc_addr"`
 	ShutdownTimeoutSec   int    `yaml:"shutdown_timeout_sec"`
 	WriterWaitTimeoutSec int    `yaml:"writer_wait_timeout_sec"`
 }
@@ -176,6 +177,12 @@ func Load() (*Config, error) {
 		cfg.Server.HTTPAddr = v
 	} else if cfg.Server.HTTPAddr == "" {
 		cfg.Server.HTTPAddr = ":8080"
+	}
+
+	if v := getEnv("GRPC_ADDR", ""); v != "" {
+		cfg.Server.GRPCAddr = v
+	} else if cfg.Server.GRPCAddr == "" {
+		cfg.Server.GRPCAddr = ":9090"
 	}
 
 	if v := getInt("HTTP_SHUTDOWN_TIMEOUT_SEC", -1); v != -1 {
