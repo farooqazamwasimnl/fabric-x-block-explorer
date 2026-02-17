@@ -102,10 +102,18 @@ type EndorsementRecord struct {
 	Identity    []byte
 }
 
+// NamespacePolicyRecord represents a policy update for a namespace.
+type NamespacePolicyRecord struct {
+	Namespace string
+	Version   uint64
+	Policy    []byte
+}
+
 // ParsedBlockData contains writes, reads, and namespace records.
 type ParsedBlockData struct {
 	Writes       []WriteRecord
 	Reads        []ReadRecord
 	TxNamespaces []TxNamespaceRecord
 	Endorsements []EndorsementRecord
+	Policies     []NamespacePolicyRecord
 }

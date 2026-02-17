@@ -12,6 +12,7 @@ type Querier interface {
 	GetBlock(ctx context.Context, blockNum int64) (Block, error)
 	GetBlockHeight(ctx context.Context) (interface{}, error)
 	GetEndorsementsByTx(ctx context.Context, arg GetEndorsementsByTxParams) ([]GetEndorsementsByTxRow, error)
+	GetNamespacePolicies(ctx context.Context, namespace string) ([]NamespacePolicy, error)
 	GetReadsByTx(ctx context.Context, arg GetReadsByTxParams) ([]GetReadsByTxRow, error)
 	GetTransactionByTxID(ctx context.Context, txID []byte) (Transaction, error)
 	GetTransactionID(ctx context.Context, arg GetTransactionIDParams) (int64, error)
@@ -23,6 +24,7 @@ type Querier interface {
 	InsertTxNamespace(ctx context.Context, arg InsertTxNamespaceParams) (int64, error)
 	InsertTxRead(ctx context.Context, arg InsertTxReadParams) error
 	InsertTxWrite(ctx context.Context, arg InsertTxWriteParams) error
+	UpsertNamespacePolicy(ctx context.Context, arg UpsertNamespacePolicyParams) error
 }
 
 var _ Querier = (*Queries)(nil)

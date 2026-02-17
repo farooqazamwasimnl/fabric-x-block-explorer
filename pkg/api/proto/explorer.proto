@@ -14,6 +14,9 @@ service BlockExplorer {
   
   // GetTransaction returns transaction details by transaction ID
   rpc GetTransaction(GetTransactionRequest) returns (TransactionResponse);
+
+  // GetNamespacePolicies returns policy versions for a namespace
+  rpc GetNamespacePolicies(GetNamespacePoliciesRequest) returns (NamespacePoliciesResponse);
   
   // HealthCheck returns service health status
   rpc HealthCheck(HealthRequest) returns (HealthResponse);
@@ -87,6 +90,25 @@ message EndorsementRecord {
 // GetTransactionRequest to fetch transaction by ID
 message GetTransactionRequest {
   string tx_id = 1; // hex encoded transaction ID
+}
+
+// GetNamespacePoliciesRequest to fetch policies by namespace
+message GetNamespacePoliciesRequest {
+  string namespace = 1;
+  bool latest = 2;
+}
+
+// NamespacePoliciesResponse contains policy versions for a namespace
+message NamespacePoliciesResponse {
+  repeated NamespacePolicy policies = 1;
+}
+
+// NamespacePolicy contains a single policy version
+message NamespacePolicy {
+  int64 id = 1;
+  string namespace = 2;
+  int64 version = 3;
+  string policy = 4;
 }
 
 // TransactionResponse contains transaction with block context

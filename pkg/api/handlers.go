@@ -264,6 +264,34 @@ func (a *API) GetTxByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, resp)
 }
 
+// GetNamespacePolicies returns policy versions for a namespace.
+// Optional query param: latest=true to return only the most recent policy.
+func (a *API) GetNamespacePolicies(w http.ResponseWriter, r *http.Request) {
+	ns := r.PathValue("namespace")
+	latest := r.URL.Query().Get("latest") == "true"
+
+	rows, err := a.q.GetNamespacePolicies(r.Context(), ns)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := []types.NamespacePolicyResponse{}
+	for _, row := range rows {
+		resp = append(resp, types.NamespacePolicyResponse{
+			ID:        row.ID,
+			Namespace: row.Namespace,
+			Version:   row.Version,
+			Policy:    hex.EncodeToString(row.Policy),
+		})
+		if latest {
+			break
+		}
+	}
+
+	writeJSON(w, resp)
+}
+
 
 func parseInt(r *http.Request, key string, def int) int {
 	v := r.URL.Query().Get(key)

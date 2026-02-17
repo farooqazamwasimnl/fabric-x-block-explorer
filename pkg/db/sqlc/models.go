@@ -15,6 +15,13 @@ type Block struct {
 	DataHash     []byte `json:"data_hash"`
 }
 
+type NamespacePolicy struct {
+	ID        int64  `json:"id"`
+	Namespace string `json:"namespace"`
+	Version   int64  `json:"version"`
+	Policy    []byte `json:"policy"`
+}
+
 type Transaction struct {
 	ID             int64  `json:"id"`
 	BlockNum       int64  `json:"block_num"`

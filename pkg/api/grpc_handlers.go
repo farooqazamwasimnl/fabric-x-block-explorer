@@ -261,6 +261,32 @@ func (s *GRPCServer) GetTransaction(ctx context.Context, req *pb.GetTransactionR
 	}, nil
 }
 
+// GetNamespacePolicies returns policy versions for a namespace
+func (s *GRPCServer) GetNamespacePolicies(ctx context.Context, req *pb.GetNamespacePoliciesRequest) (*pb.NamespacePoliciesResponse, error) {
+	rows, err := s.api.q.GetNamespacePolicies(ctx, req.Namespace)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get namespace policies: %v", err)
+	}
+
+	resp := &pb.NamespacePoliciesResponse{
+		Policies: make([]*pb.NamespacePolicy, 0, len(rows)),
+	}
+
+	for _, row := range rows {
+		resp.Policies = append(resp.Policies, &pb.NamespacePolicy{
+			Id:        row.ID,
+			Namespace: row.Namespace,
+			Version:   row.Version,
+			Policy:    hex.EncodeToString(row.Policy),
+		})
+		if req.Latest {
+			break
+		}
+	}
+
+	return resp, nil
+}
+
 // HealthCheck returns service health status
 func (s *GRPCServer) HealthCheck(ctx context.Context, req *pb.HealthRequest) (*pb.HealthResponse, error) {
 	if s.api.pool != nil {

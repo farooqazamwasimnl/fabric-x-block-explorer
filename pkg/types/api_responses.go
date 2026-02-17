@@ -55,6 +55,13 @@ type EndorsementResponse struct {
 	Identity    json.RawMessage `json:"identity,omitempty"`
 }
 
+type NamespacePolicyResponse struct {
+	ID        int64  `json:"id"`
+	Namespace string `json:"namespace"`
+	Version   int64  `json:"version"`
+	Policy    string `json:"policy"`
+}
+
 type TxWithBlockResponse struct {
 	Transaction TransactionWithWriteSets `json:"transaction"`
 	Block       BlockHeaderOnly          `json:"block"`

@@ -17,6 +17,7 @@ func (a *API) Router() http.Handler {
 	mux.HandleFunc("GET /blocks/height", a.GetBlockHeight)
 	mux.HandleFunc("GET /blocks/{block_num}", a.GetBlockByNumber)
 	mux.HandleFunc("GET /tx/{tx_id_hex}", a.GetTxByID)
+	mux.HandleFunc("GET /policies/{namespace}", a.GetNamespacePolicies)
 	mux.HandleFunc("GET /healthz", a.HealthHandler)
 
 	swaggerFS := http.FileServer(http.Dir("./pkg/swagger/ui"))

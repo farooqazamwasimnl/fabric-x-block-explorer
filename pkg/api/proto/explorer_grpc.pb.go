@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	BlockExplorer_GetBlockHeight_FullMethodName = "/explorer.BlockExplorer/GetBlockHeight"
-	BlockExplorer_GetBlock_FullMethodName       = "/explorer.BlockExplorer/GetBlock"
-	BlockExplorer_GetTransaction_FullMethodName = "/explorer.BlockExplorer/GetTransaction"
-	BlockExplorer_HealthCheck_FullMethodName    = "/explorer.BlockExplorer/HealthCheck"
+	BlockExplorer_GetBlockHeight_FullMethodName       = "/explorer.BlockExplorer/GetBlockHeight"
+	BlockExplorer_GetBlock_FullMethodName             = "/explorer.BlockExplorer/GetBlock"
+	BlockExplorer_GetTransaction_FullMethodName       = "/explorer.BlockExplorer/GetTransaction"
+	BlockExplorer_GetNamespacePolicies_FullMethodName = "/explorer.BlockExplorer/GetNamespacePolicies"
+	BlockExplorer_HealthCheck_FullMethodName          = "/explorer.BlockExplorer/HealthCheck"
 )
 
 // BlockExplorerClient is the client API for BlockExplorer service.
@@ -37,6 +38,8 @@ type BlockExplorerClient interface {
 	GetBlock(ctx context.Context, in *GetBlockRequest, opts ...grpc.CallOption) (*BlockResponse, error)
 	// GetTransaction returns transaction details by transaction ID
 	GetTransaction(ctx context.Context, in *GetTransactionRequest, opts ...grpc.CallOption) (*TransactionResponse, error)
+	// GetNamespacePolicies returns policy versions for a namespace
+	GetNamespacePolicies(ctx context.Context, in *GetNamespacePoliciesRequest, opts ...grpc.CallOption) (*NamespacePoliciesResponse, error)
 	// HealthCheck returns service health status
 	HealthCheck(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
 }
@@ -79,6 +82,16 @@ func (c *blockExplorerClient) GetTransaction(ctx context.Context, in *GetTransac
 	return out, nil
 }
 
+func (c *blockExplorerClient) GetNamespacePolicies(ctx context.Context, in *GetNamespacePoliciesRequest, opts ...grpc.CallOption) (*NamespacePoliciesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(NamespacePoliciesResponse)
+	err := c.cc.Invoke(ctx, BlockExplorer_GetNamespacePolicies_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *blockExplorerClient) HealthCheck(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(HealthResponse)
@@ -101,6 +114,8 @@ type BlockExplorerServer interface {
 	GetBlock(context.Context, *GetBlockRequest) (*BlockResponse, error)
 	// GetTransaction returns transaction details by transaction ID
 	GetTransaction(context.Context, *GetTransactionRequest) (*TransactionResponse, error)
+	// GetNamespacePolicies returns policy versions for a namespace
+	GetNamespacePolicies(context.Context, *GetNamespacePoliciesRequest) (*NamespacePoliciesResponse, error)
 	// HealthCheck returns service health status
 	HealthCheck(context.Context, *HealthRequest) (*HealthResponse, error)
 	mustEmbedUnimplementedBlockExplorerServer()
@@ -121,6 +136,9 @@ func (UnimplementedBlockExplorerServer) GetBlock(context.Context, *GetBlockReque
 }
 func (UnimplementedBlockExplorerServer) GetTransaction(context.Context, *GetTransactionRequest) (*TransactionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTransaction not implemented")
+}
+func (UnimplementedBlockExplorerServer) GetNamespacePolicies(context.Context, *GetNamespacePoliciesRequest) (*NamespacePoliciesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetNamespacePolicies not implemented")
 }
 func (UnimplementedBlockExplorerServer) HealthCheck(context.Context, *HealthRequest) (*HealthResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method HealthCheck not implemented")
@@ -200,6 +218,24 @@ func _BlockExplorer_GetTransaction_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BlockExplorer_GetNamespacePolicies_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetNamespacePoliciesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BlockExplorerServer).GetNamespacePolicies(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BlockExplorer_GetNamespacePolicies_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BlockExplorerServer).GetNamespacePolicies(ctx, req.(*GetNamespacePoliciesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _BlockExplorer_HealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(HealthRequest)
 	if err := dec(in); err != nil {
@@ -236,6 +272,10 @@ var BlockExplorer_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTransaction",
 			Handler:    _BlockExplorer_GetTransaction_Handler,
+		},
+		{
+			MethodName: "GetNamespacePolicies",
+			Handler:    _BlockExplorer_GetNamespacePolicies_Handler,
 		},
 		{
 			MethodName: "HealthCheck",

@@ -634,6 +634,173 @@ func (x *GetTransactionRequest) GetTxId() string {
 	return ""
 }
 
+// GetNamespacePoliciesRequest to fetch policies by namespace
+type GetNamespacePoliciesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Namespace     string                 `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Latest        bool                   `protobuf:"varint,2,opt,name=latest,proto3" json:"latest,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNamespacePoliciesRequest) Reset() {
+	*x = GetNamespacePoliciesRequest{}
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNamespacePoliciesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNamespacePoliciesRequest) ProtoMessage() {}
+
+func (x *GetNamespacePoliciesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNamespacePoliciesRequest.ProtoReflect.Descriptor instead.
+func (*GetNamespacePoliciesRequest) Descriptor() ([]byte, []int) {
+	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetNamespacePoliciesRequest) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *GetNamespacePoliciesRequest) GetLatest() bool {
+	if x != nil {
+		return x.Latest
+	}
+	return false
+}
+
+// NamespacePoliciesResponse contains policy versions for a namespace
+type NamespacePoliciesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Policies      []*NamespacePolicy     `protobuf:"bytes,1,rep,name=policies,proto3" json:"policies,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NamespacePoliciesResponse) Reset() {
+	*x = NamespacePoliciesResponse{}
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NamespacePoliciesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NamespacePoliciesResponse) ProtoMessage() {}
+
+func (x *NamespacePoliciesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NamespacePoliciesResponse.ProtoReflect.Descriptor instead.
+func (*NamespacePoliciesResponse) Descriptor() ([]byte, []int) {
+	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *NamespacePoliciesResponse) GetPolicies() []*NamespacePolicy {
+	if x != nil {
+		return x.Policies
+	}
+	return nil
+}
+
+// NamespacePolicy contains a single policy version
+type NamespacePolicy struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Namespace     string                 `protobuf:"bytes,2,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Version       int64                  `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
+	Policy        string                 `protobuf:"bytes,4,opt,name=policy,proto3" json:"policy,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NamespacePolicy) Reset() {
+	*x = NamespacePolicy{}
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NamespacePolicy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NamespacePolicy) ProtoMessage() {}
+
+func (x *NamespacePolicy) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NamespacePolicy.ProtoReflect.Descriptor instead.
+func (*NamespacePolicy) Descriptor() ([]byte, []int) {
+	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *NamespacePolicy) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *NamespacePolicy) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *NamespacePolicy) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *NamespacePolicy) GetPolicy() string {
+	if x != nil {
+		return x.Policy
+	}
+	return ""
+}
+
 // TransactionResponse contains transaction with block context
 type TransactionResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -645,7 +812,7 @@ type TransactionResponse struct {
 
 func (x *TransactionResponse) Reset() {
 	*x = TransactionResponse{}
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[9]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -657,7 +824,7 @@ func (x *TransactionResponse) String() string {
 func (*TransactionResponse) ProtoMessage() {}
 
 func (x *TransactionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[9]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -670,7 +837,7 @@ func (x *TransactionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransactionResponse.ProtoReflect.Descriptor instead.
 func (*TransactionResponse) Descriptor() ([]byte, []int) {
-	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{9}
+	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *TransactionResponse) GetTransaction() *TransactionWithWrites {
@@ -700,7 +867,7 @@ type BlockHeader struct {
 
 func (x *BlockHeader) Reset() {
 	*x = BlockHeader{}
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[10]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -712,7 +879,7 @@ func (x *BlockHeader) String() string {
 func (*BlockHeader) ProtoMessage() {}
 
 func (x *BlockHeader) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[10]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -725,7 +892,7 @@ func (x *BlockHeader) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockHeader.ProtoReflect.Descriptor instead.
 func (*BlockHeader) Descriptor() ([]byte, []int) {
-	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{10}
+	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *BlockHeader) GetBlockNum() int64 {
@@ -765,7 +932,7 @@ type HealthRequest struct {
 
 func (x *HealthRequest) Reset() {
 	*x = HealthRequest{}
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[11]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -777,7 +944,7 @@ func (x *HealthRequest) String() string {
 func (*HealthRequest) ProtoMessage() {}
 
 func (x *HealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[11]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -790,7 +957,7 @@ func (x *HealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthRequest.ProtoReflect.Descriptor instead.
 func (*HealthRequest) Descriptor() ([]byte, []int) {
-	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{11}
+	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{14}
 }
 
 // HealthResponse contains service health status
@@ -804,7 +971,7 @@ type HealthResponse struct {
 
 func (x *HealthResponse) Reset() {
 	*x = HealthResponse{}
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[12]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -816,7 +983,7 @@ func (x *HealthResponse) String() string {
 func (*HealthResponse) ProtoMessage() {}
 
 func (x *HealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[12]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -829,7 +996,7 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
 func (*HealthResponse) Descriptor() ([]byte, []int) {
-	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{12}
+	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *HealthResponse) GetStatus() string {
@@ -900,7 +1067,17 @@ const file_pkg_api_proto_explorer_proto_rawDesc = "" +
 	"\a_msp_idB\v\n" +
 	"\t_identity\",\n" +
 	"\x15GetTransactionRequest\x12\x13\n" +
-	"\x05tx_id\x18\x01 \x01(\tR\x04txId\"\x85\x01\n" +
+	"\x05tx_id\x18\x01 \x01(\tR\x04txId\"S\n" +
+	"\x1bGetNamespacePoliciesRequest\x12\x1c\n" +
+	"\tnamespace\x18\x01 \x01(\tR\tnamespace\x12\x16\n" +
+	"\x06latest\x18\x02 \x01(\bR\x06latest\"R\n" +
+	"\x19NamespacePoliciesResponse\x125\n" +
+	"\bpolicies\x18\x01 \x03(\v2\x19.explorer.NamespacePolicyR\bpolicies\"q\n" +
+	"\x0fNamespacePolicy\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1c\n" +
+	"\tnamespace\x18\x02 \x01(\tR\tnamespace\x12\x18\n" +
+	"\aversion\x18\x03 \x01(\x03R\aversion\x12\x16\n" +
+	"\x06policy\x18\x04 \x01(\tR\x06policy\"\x85\x01\n" +
 	"\x13TransactionResponse\x12A\n" +
 	"\vtransaction\x18\x01 \x01(\v2\x1f.explorer.TransactionWithWritesR\vtransaction\x12+\n" +
 	"\x05block\x18\x02 \x01(\v2\x15.explorer.BlockHeaderR\x05block\"\x87\x01\n" +
@@ -912,11 +1089,12 @@ const file_pkg_api_proto_explorer_proto_rawDesc = "" +
 	"\rHealthRequest\"B\n" +
 	"\x0eHealthResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x18\n" +
-	"\adetails\x18\x02 \x01(\tR\adetails2\xb2\x02\n" +
+	"\adetails\x18\x02 \x01(\tR\adetails2\x96\x03\n" +
 	"\rBlockExplorer\x12M\n" +
 	"\x0eGetBlockHeight\x12\x1c.explorer.BlockHeightRequest\x1a\x1d.explorer.BlockHeightResponse\x12>\n" +
 	"\bGetBlock\x12\x19.explorer.GetBlockRequest\x1a\x17.explorer.BlockResponse\x12P\n" +
-	"\x0eGetTransaction\x12\x1f.explorer.GetTransactionRequest\x1a\x1d.explorer.TransactionResponse\x12@\n" +
+	"\x0eGetTransaction\x12\x1f.explorer.GetTransactionRequest\x1a\x1d.explorer.TransactionResponse\x12b\n" +
+	"\x14GetNamespacePolicies\x12%.explorer.GetNamespacePoliciesRequest\x1a#.explorer.NamespacePoliciesResponse\x12@\n" +
 	"\vHealthCheck\x12\x17.explorer.HealthRequest\x1a\x18.explorer.HealthResponseBNZLgithub.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/api/protob\x06proto3"
 
 var (
@@ -931,42 +1109,48 @@ func file_pkg_api_proto_explorer_proto_rawDescGZIP() []byte {
 	return file_pkg_api_proto_explorer_proto_rawDescData
 }
 
-var file_pkg_api_proto_explorer_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_pkg_api_proto_explorer_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_pkg_api_proto_explorer_proto_goTypes = []any{
-	(*BlockHeightRequest)(nil),    // 0: explorer.BlockHeightRequest
-	(*BlockHeightResponse)(nil),   // 1: explorer.BlockHeightResponse
-	(*GetBlockRequest)(nil),       // 2: explorer.GetBlockRequest
-	(*BlockResponse)(nil),         // 3: explorer.BlockResponse
-	(*TransactionWithWrites)(nil), // 4: explorer.TransactionWithWrites
-	(*ReadRecord)(nil),            // 5: explorer.ReadRecord
-	(*WriteRecord)(nil),           // 6: explorer.WriteRecord
-	(*EndorsementRecord)(nil),     // 7: explorer.EndorsementRecord
-	(*GetTransactionRequest)(nil), // 8: explorer.GetTransactionRequest
-	(*TransactionResponse)(nil),   // 9: explorer.TransactionResponse
-	(*BlockHeader)(nil),           // 10: explorer.BlockHeader
-	(*HealthRequest)(nil),         // 11: explorer.HealthRequest
-	(*HealthResponse)(nil),        // 12: explorer.HealthResponse
+	(*BlockHeightRequest)(nil),          // 0: explorer.BlockHeightRequest
+	(*BlockHeightResponse)(nil),         // 1: explorer.BlockHeightResponse
+	(*GetBlockRequest)(nil),             // 2: explorer.GetBlockRequest
+	(*BlockResponse)(nil),               // 3: explorer.BlockResponse
+	(*TransactionWithWrites)(nil),       // 4: explorer.TransactionWithWrites
+	(*ReadRecord)(nil),                  // 5: explorer.ReadRecord
+	(*WriteRecord)(nil),                 // 6: explorer.WriteRecord
+	(*EndorsementRecord)(nil),           // 7: explorer.EndorsementRecord
+	(*GetTransactionRequest)(nil),       // 8: explorer.GetTransactionRequest
+	(*GetNamespacePoliciesRequest)(nil), // 9: explorer.GetNamespacePoliciesRequest
+	(*NamespacePoliciesResponse)(nil),   // 10: explorer.NamespacePoliciesResponse
+	(*NamespacePolicy)(nil),             // 11: explorer.NamespacePolicy
+	(*TransactionResponse)(nil),         // 12: explorer.TransactionResponse
+	(*BlockHeader)(nil),                 // 13: explorer.BlockHeader
+	(*HealthRequest)(nil),               // 14: explorer.HealthRequest
+	(*HealthResponse)(nil),              // 15: explorer.HealthResponse
 }
 var file_pkg_api_proto_explorer_proto_depIdxs = []int32{
 	4,  // 0: explorer.BlockResponse.transactions:type_name -> explorer.TransactionWithWrites
 	5,  // 1: explorer.TransactionWithWrites.reads:type_name -> explorer.ReadRecord
 	6,  // 2: explorer.TransactionWithWrites.writes:type_name -> explorer.WriteRecord
 	7,  // 3: explorer.TransactionWithWrites.endorsements:type_name -> explorer.EndorsementRecord
-	4,  // 4: explorer.TransactionResponse.transaction:type_name -> explorer.TransactionWithWrites
-	10, // 5: explorer.TransactionResponse.block:type_name -> explorer.BlockHeader
-	0,  // 6: explorer.BlockExplorer.GetBlockHeight:input_type -> explorer.BlockHeightRequest
-	2,  // 7: explorer.BlockExplorer.GetBlock:input_type -> explorer.GetBlockRequest
-	8,  // 8: explorer.BlockExplorer.GetTransaction:input_type -> explorer.GetTransactionRequest
-	11, // 9: explorer.BlockExplorer.HealthCheck:input_type -> explorer.HealthRequest
-	1,  // 10: explorer.BlockExplorer.GetBlockHeight:output_type -> explorer.BlockHeightResponse
-	3,  // 11: explorer.BlockExplorer.GetBlock:output_type -> explorer.BlockResponse
-	9,  // 12: explorer.BlockExplorer.GetTransaction:output_type -> explorer.TransactionResponse
-	12, // 13: explorer.BlockExplorer.HealthCheck:output_type -> explorer.HealthResponse
-	10, // [10:14] is the sub-list for method output_type
-	6,  // [6:10] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	11, // 4: explorer.NamespacePoliciesResponse.policies:type_name -> explorer.NamespacePolicy
+	4,  // 5: explorer.TransactionResponse.transaction:type_name -> explorer.TransactionWithWrites
+	13, // 6: explorer.TransactionResponse.block:type_name -> explorer.BlockHeader
+	0,  // 7: explorer.BlockExplorer.GetBlockHeight:input_type -> explorer.BlockHeightRequest
+	2,  // 8: explorer.BlockExplorer.GetBlock:input_type -> explorer.GetBlockRequest
+	8,  // 9: explorer.BlockExplorer.GetTransaction:input_type -> explorer.GetTransactionRequest
+	9,  // 10: explorer.BlockExplorer.GetNamespacePolicies:input_type -> explorer.GetNamespacePoliciesRequest
+	14, // 11: explorer.BlockExplorer.HealthCheck:input_type -> explorer.HealthRequest
+	1,  // 12: explorer.BlockExplorer.GetBlockHeight:output_type -> explorer.BlockHeightResponse
+	3,  // 13: explorer.BlockExplorer.GetBlock:output_type -> explorer.BlockResponse
+	12, // 14: explorer.BlockExplorer.GetTransaction:output_type -> explorer.TransactionResponse
+	10, // 15: explorer.BlockExplorer.GetNamespacePolicies:output_type -> explorer.NamespacePoliciesResponse
+	15, // 16: explorer.BlockExplorer.HealthCheck:output_type -> explorer.HealthResponse
+	12, // [12:17] is the sub-list for method output_type
+	7,  // [7:12] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_pkg_api_proto_explorer_proto_init() }
@@ -983,7 +1167,7 @@ func file_pkg_api_proto_explorer_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pkg_api_proto_explorer_proto_rawDesc), len(file_pkg_api_proto_explorer_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -55,6 +55,7 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 	reads := parsedData.Reads
 	txNamespaces := parsedData.TxNamespaces
 	endorsements := parsedData.Endorsements
+	policies := parsedData.Policies
 
 	var (
 		tx  pgx.Tx
@@ -165,6 +166,20 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 			Endorsement:   e.Endorsement,
 			MspID:         mspID,
 			Identity:      e.Identity,
+		}); err != nil {
+			return err
+		}
+	}
+
+	// Insert namespace policies
+	for _, p := range policies {
+		if len(p.Policy) == 0 {
+			continue
+		}
+		if err := q.UpsertNamespacePolicy(ctx, dbsqlc.UpsertNamespacePolicyParams{
+			Namespace: p.Namespace,
+			Version:   int64(p.Version),
+			Policy:    p.Policy,
 		}); err != nil {
 			return err
 		}

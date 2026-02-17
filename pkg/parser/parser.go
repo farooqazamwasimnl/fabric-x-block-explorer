@@ -22,6 +22,7 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 	reads := []types.ReadRecord{}
 	txNamespaces := []types.TxNamespaceRecord{}
 	endorsements := []types.EndorsementRecord{}
+	policies := []types.NamespacePolicyRecord{}
 
 	header := b.GetHeader()
 	if header == nil {
@@ -35,7 +36,7 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 	}
 
 	if b.Metadata == nil || len(b.Metadata.Metadata) <= int(common.BlockMetadataIndex_TRANSACTIONS_FILTER) {
-		return &types.ParsedBlockData{Writes: writes, Reads: reads, TxNamespaces: txNamespaces, Endorsements: endorsements}, blockInfo, fmt.Errorf("block metadata missing TRANSACTIONS_FILTER")
+		return &types.ParsedBlockData{Writes: writes, Reads: reads, TxNamespaces: txNamespaces, Endorsements: endorsements, Policies: policies}, blockInfo, fmt.Errorf("block metadata missing TRANSACTIONS_FILTER")
 	}
 	txFilter := b.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER]
 
@@ -56,7 +57,13 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 			continue
 		}
 
-		// Extract RW sets
+		// Check for namespace policy updates first
+		if policyItems, ok := extractPolicies(env); ok {
+			policies = append(policies, policyItems...)
+			continue
+		}
+
+		// Extract RW sets (normal transaction)
 		rwsets, err := rwSets(env)
 		if err != nil {
 			log.Printf("block %d tx %d invalid rwset: %v", header.Number, txNum, err)
@@ -119,7 +126,65 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 		Reads:        reads,
 		TxNamespaces: txNamespaces,
 		Endorsements: endorsements,
+		Policies:     policies,
 	}, blockInfo, nil
+}
+
+const metaNamespaceID = "_meta"
+
+// extractPolicies attempts to parse namespace policy updates from an envelope payload.
+// Returns ok=true if the payload is a policy update.
+func extractPolicies(env *common.Envelope) ([]types.NamespacePolicyRecord, bool) {
+	pl := &common.Payload{}
+	if err := proto.Unmarshal(env.Payload, pl); err != nil {
+		return nil, false
+	}
+
+	chdr := &common.ChannelHeader{}
+	if pl.Header == nil || pl.Header.ChannelHeader == nil {
+		return nil, false
+	}
+	if err := proto.Unmarshal(pl.Header.ChannelHeader, chdr); err != nil {
+		return nil, false
+	}
+	if chdr.Type != int32(common.HeaderType_CONFIG) && chdr.Type != int32(common.HeaderType_CONFIG_UPDATE) {
+		return nil, false
+	}
+
+	policies := &protoblocktx.NamespacePolicies{}
+	if err := proto.Unmarshal(pl.Data, policies); err == nil && len(policies.Policies) > 0 {
+		items := make([]types.NamespacePolicyRecord, 0, len(policies.Policies))
+		for _, pd := range policies.Policies {
+			if len(pd.Policy) == 0 {
+				continue
+			}
+			ns := pd.Namespace
+			if ns == "" {
+				ns = metaNamespaceID
+			}
+			items = append(items, types.NamespacePolicyRecord{
+				Namespace: ns,
+				Version:   pd.Version,
+				Policy:    pd.Policy,
+			})
+		}
+		if len(items) > 0 {
+			return items, true
+		}
+	}
+
+	configTx := &protoblocktx.ConfigTransaction{}
+	if err := proto.Unmarshal(pl.Data, configTx); err == nil && len(configTx.Envelope) > 0 {
+		return []types.NamespacePolicyRecord{
+			{
+				Namespace: metaNamespaceID,
+				Version:   configTx.Version,
+				Policy:    configTx.Envelope,
+			},
+		}, true
+	}
+
+	return nil, false
 }
 
 // rwSets extracts namespace read-write sets and txID from an envelope.
