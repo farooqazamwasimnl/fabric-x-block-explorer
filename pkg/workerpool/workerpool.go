@@ -8,18 +8,20 @@ package workerpool
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/blockpipeline"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/db"
+	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/logging"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/sidecarstream"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/types"
 	"github.com/hyperledger/fabric-protos-go-apiv2/common"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
 )
+
+var logger = logging.New("workerpool")
 
 // Config controls pool sizes and buffer sizes.
 type Config struct {
@@ -83,10 +85,10 @@ func (p *Pool) Start(ctx context.Context, errCh chan<- error) *errgroup.Group {
 		procWg.Add(1)
 		g.Go(func() error {
 			defer procWg.Done()
-			log.Printf("processor[%d] started", workerID)
+			logger.Infof("processor[%d] started", workerID)
 			// BlockProcessor does not return a value; call it and return nil.
 			blockpipeline.BlockProcessor(ctx, p.rawCh, p.procCh, errCh)
-			log.Printf("processor[%d] stopped", workerID)
+			logger.Infof("processor[%d] stopped", workerID)
 			return nil
 		})
 	}
@@ -105,7 +107,7 @@ func (p *Pool) Start(ctx context.Context, errCh chan<- error) *errgroup.Group {
 	for i := 0; i < p.cfg.WriterCount; i++ {
 		workerID := i
 		g.Go(func() error {
-			log.Printf("writer[%d] started", workerID)
+			logger.Infof("writer[%d] started", workerID)
 			// Acquire a dedicated connection for this writer
 			conn, err := p.pool.Acquire(context.Background())
 			if err != nil {
@@ -133,7 +135,7 @@ func (p *Pool) Start(ctx context.Context, errCh chan<- error) *errgroup.Group {
 						case pb, ok := <-p.procCh:
 							if !ok {
 								cancel()
-								log.Printf("writer[%d] drained and stopping", workerID)
+								logger.Infof("writer[%d] drained and stopping", workerID)
 								return nil
 							}
 							if err := writer.WriteProcessedBlock(drainCtx, pb); err != nil {
@@ -144,14 +146,14 @@ func (p *Pool) Start(ctx context.Context, errCh chan<- error) *errgroup.Group {
 							}
 						default:
 							cancel()
-							log.Printf("writer[%d] stopping due to context cancellation", workerID)
+								logger.Infof("writer[%d] stopping due to context cancellation", workerID)
 							return nil
 						}
 					}
 				case pb, ok := <-p.procCh:
 					if !ok {
 						// Channel closed: no more work
-						log.Printf("writer[%d] finished (procCh closed)", workerID)
+						logger.Infof("writer[%d] finished (procCh closed)", workerID)
 						return nil
 					}
 					// Write the processed block using the per-connection writer.

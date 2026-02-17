@@ -10,8 +10,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
 
+	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/constants"
+	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/logging"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/types"
 	"github.com/hyperledger/fabric-protos-go-apiv2/common"
 	"github.com/hyperledger/fabric-protos-go-apiv2/msp"
@@ -19,6 +20,8 @@ import (
 	"github.com/hyperledger/fabric-x-committer/api/protoblocktx"
 	"google.golang.org/protobuf/proto"
 )
+
+var logger = logging.New("parser")
 
 // Parse converts a Fabric block into ParsedBlockData and BlockInfo.
 func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
@@ -57,7 +60,7 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 		// Unmarshal envelope
 		env := &common.Envelope{}
 		if err := proto.Unmarshal(envBytes, env); err != nil {
-			log.Printf("block %d tx %d invalid envelope: %v", header.Number, txNum, err)
+			logger.Warnf("block %d tx %d invalid envelope: %v", header.Number, txNum, err)
 			continue
 		}
 
@@ -68,73 +71,106 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 		}
 
 		// Extract RW sets (normal transaction)
-		rwsets, err := rwSets(env)
+		nsList, err := rwSets(env)
 		if err != nil {
-			log.Printf("block %d tx %d invalid rwset: %v", header.Number, txNum, err)
+			logger.Warnf("block %d tx %d invalid rwset: %v", header.Number, txNum, err)
 			continue
 		}
 
-		// Convert RW sets to WriteRecord and attach validation code
-		for _, rw := range rwsets {
+		// Process each namespace in the transaction
+		for _, nsData := range nsList {
+			ns := nsData.Namespace
+
 			txNsRecord := types.TxNamespaceRecord{
 				BlockNum:       header.Number,
 				TxNum:          uint64(txNum),
-				TxID:           rw.TxID,
-				NsID:           rw.Namespace,
-				NsVersion:      rw.NsVersion,
+				TxID:           nsData.TxID,
+				NsID:           ns.NsId,
+				NsVersion:      ns.NsVersion,
 				ValidationCode: int32(validationCode),
 			}
 			txNamespaces = append(txNamespaces, txNsRecord)
 
-			if len(rw.Endorsement) > 0 {
+			if len(nsData.Endorsement) > 0 {
 				// Try to extract identity from endorsement; fallback to signature-only
-				mspID, identityJSON, err := endorsementToIdentityJSON(rw.Endorsement)
+				mspID, identityJSON, err := endorsementToIdentityJSON(nsData.Endorsement)
 				if err != nil {
 					endorsements = append(endorsements, types.EndorsementRecord{
 						BlockNum:    header.Number,
 						TxNum:       uint64(txNum),
-						NsID:        rw.Namespace,
-						Endorsement: rw.Endorsement,
+						NsID:        ns.NsId,
+						Endorsement: nsData.Endorsement,
 					})
 				} else {
 					endorsements = append(endorsements, types.EndorsementRecord{
 						BlockNum:    header.Number,
 						TxNum:       uint64(txNum),
-						NsID:        rw.Namespace,
-						Endorsement: rw.Endorsement,
+						NsID:        ns.NsId,
+						Endorsement: nsData.Endorsement,
 						MspID:       mspID,
 						Identity:    identityJSON,
 					})
 				}
 			}
 
-			for _, read := range rw.Rwset.Reads {
+			// Process reads from ReadsOnly
+			for _, ro := range ns.ReadsOnly {
 				readRecord := types.ReadRecord{
 					BlockNum:    header.Number,
 					TxNum:       uint64(txNum),
-					NsID:        rw.Namespace,
-					Key:         read.Key,
-					IsReadWrite: read.IsReadWrite,
+					NsID:        ns.NsId,
+					Key:         string(ro.Key),
+					IsReadWrite: false,
 				}
-				if read.Version != nil {
-					readRecord.Version = &read.Version.BlockNum
+				if ro.Version != nil && *ro.Version > 0 {
+					readRecord.Version = ro.Version
 				}
 				reads = append(reads, readRecord)
 			}
 
-			records := types.Records(
-				rw.Namespace,
-				header.Number,
-				uint64(txNum),
-				rw.TxID,
-				rw.Rwset,
-			)
+			// Process reads and writes from ReadWrites
+			for _, rw := range ns.ReadWrites {
+				// Add to reads
+				readRecord := types.ReadRecord{
+					BlockNum:    header.Number,
+					TxNum:       uint64(txNum),
+					NsID:        ns.NsId,
+					Key:         string(rw.Key),
+					IsReadWrite: true,
+				}
+				if rw.Version != nil && *rw.Version > 0 {
+					readRecord.Version = rw.Version
+				}
+				reads = append(reads, readRecord)
 
-			for i := range records {
-				records[i].ValidationCode = int32(validationCode)
+				// Add to writes
+				writes = append(writes, types.WriteRecord{
+					Namespace:      ns.NsId,
+					Key:            string(rw.Key),
+					BlockNum:       header.Number,
+					TxNum:          uint64(txNum),
+					Value:          rw.Value,
+					TxID:           nsData.TxID,
+					ValidationCode: int32(validationCode),
+					IsBlindWrite:   false,
+					ReadVersion:    rw.Version,
+				})
 			}
 
-			writes = append(writes, records...)
+			// Process BlindWrites
+			for _, bw := range ns.BlindWrites {
+				writes = append(writes, types.WriteRecord{
+					Namespace:      ns.NsId,
+					Key:            string(bw.Key),
+					BlockNum:       header.Number,
+					TxNum:          uint64(txNum),
+					Value:          bw.Value,
+					TxID:           nsData.TxID,
+					ValidationCode: int32(validationCode),
+					IsBlindWrite:   true,
+					ReadVersion:    nil,
+				})
+			}
 		}
 	}
 
@@ -217,11 +253,11 @@ func extractPolicies(env *common.Envelope) ([]types.NamespacePolicyRecord, bool)
 			}
 			ns := pd.Namespace
 			if ns == "" {
-				ns = metaNamespaceID
+				ns = constants.MetaNamespaceID
 			}
 			policyJSON, err := policyToJSON(pd.Policy)
 			if err != nil {
-				log.Printf("failed to convert policy to JSON for namespace %s: %v", ns, err)
+				logger.Warnf("failed to convert policy to JSON for namespace %s: %v", ns, err)
 				continue
 			}
 			items = append(items, types.NamespacePolicyRecord{
@@ -239,12 +275,12 @@ func extractPolicies(env *common.Envelope) ([]types.NamespacePolicyRecord, bool)
 	if err := proto.Unmarshal(pl.Data, configTx); err == nil && len(configTx.Envelope) > 0 {
 		policyJSON, err := policyToJSON(configTx.Envelope)
 		if err != nil {
-			log.Printf("failed to convert config envelope to JSON: %v", err)
+			logger.Warnf("failed to convert config envelope to JSON: %v", err)
 			return nil, false
 		}
 		return []types.NamespacePolicyRecord{
 			{
-				Namespace:  metaNamespaceID,
+				Namespace:  constants.MetaNamespaceID,
 				Version:    configTx.Version,
 				PolicyJSON: policyJSON,
 			},
@@ -254,10 +290,10 @@ func extractPolicies(env *common.Envelope) ([]types.NamespacePolicyRecord, bool)
 	return nil, false
 }
 
-// rwSets extracts namespace read-write sets and txID from an envelope.
-// Returns a slice of nsRwset preserving the original structure.
-func rwSets(env *common.Envelope) ([]nsRwset, error) {
-	out := []nsRwset{}
+// rwSets extracts namespace data and txID from an envelope.
+// Returns the proto TxNamespace data directly without intermediate conversion.
+func rwSets(env *common.Envelope) ([]nsData, error) {
+	out := []nsData{}
 
 	pl := &common.Payload{}
 	if err := proto.Unmarshal(env.Payload, pl); err != nil {
@@ -276,63 +312,18 @@ func rwSets(env *common.Envelope) ([]nsRwset, error) {
 	}
 
 	if len(tx.Signatures) > 0 && len(tx.Signatures) != len(tx.Namespaces) {
-		log.Printf("tx %s signature count %d does not match namespaces %d", txID, len(tx.Signatures), len(tx.Namespaces))
+		logger.Warnf("tx %s signature count %d does not match namespaces %d", txID, len(tx.Signatures), len(tx.Namespaces))
 	}
 
 	for i, ns := range tx.Namespaces {
-		rws := types.ReadWriteSet{
-			Reads:  []types.KVRead{},
-			Writes: []types.KVWrite{},
-		}
-
-		for _, ro := range ns.ReadsOnly {
-			read := types.KVRead{Key: string(ro.Key), IsReadWrite: false}
-			if ro.Version != nil && *ro.Version > 0 {
-				read.Version = &types.Version{
-					BlockNum: *ro.Version,
-				}
-			}
-			rws.Reads = append(rws.Reads, read)
-		}
-
-		for _, bw := range ns.BlindWrites {
-			rws.Writes = append(rws.Writes, types.KVWrite{
-				Key:          string(bw.Key),
-				Value:        bw.Value,
-				IsBlindWrite: true,
-				ReadVersion:  nil,
-			})
-		}
-
-		for _, rw := range ns.ReadWrites {
-			read := types.KVRead{Key: string(rw.Key), IsReadWrite: true}
-			var readVersion *uint64
-			if rw.Version != nil && *rw.Version > 0 {
-				read.Version = &types.Version{
-					BlockNum: *rw.Version,
-				}
-				readVersion = rw.Version
-			}
-			rws.Reads = append(rws.Reads, read)
-
-			rws.Writes = append(rws.Writes, types.KVWrite{
-				Key:          string(rw.Key),
-				Value:        rw.Value,
-				IsBlindWrite: false,
-				ReadVersion:  readVersion,
-			})
-		}
-
 		var endorsement []byte
 		if i < len(tx.Signatures) {
 			endorsement = tx.Signatures[i]
 		}
 
-		out = append(out, nsRwset{
-			Namespace:   ns.NsId,
-			Rwset:       rws,
+		out = append(out, nsData{
+			Namespace:   ns,
 			TxID:        txID,
-			NsVersion:   ns.NsVersion,
 			Endorsement: endorsement,
 		})
 	}
@@ -340,10 +331,9 @@ func rwSets(env *common.Envelope) ([]nsRwset, error) {
 	return out, nil
 }
 
-type nsRwset struct {
-	Namespace   string             `json:"namespace"`
-	Rwset       types.ReadWriteSet `json:"rwset"`
-	TxID        string             `json:"-"`
-	NsVersion   uint64             `json:"-"`
-	Endorsement []byte             `json:"-"`
+// nsData wraps a TxNamespace with transaction metadata.
+type nsData struct {
+	Namespace   *protoblocktx.TxNamespace
+	TxID        string
+	Endorsement []byte
 }

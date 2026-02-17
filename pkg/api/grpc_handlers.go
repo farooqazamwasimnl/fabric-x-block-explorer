@@ -11,7 +11,9 @@ import (
 	"encoding/hex"
 
 	pb "github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/api/proto"
+	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/constants"
 	dbsqlc "github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/db/sqlc"
+	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/util"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -25,6 +27,74 @@ type GRPCServer struct {
 // NewGRPCServer creates a new gRPC server instance
 func NewGRPCServer(api *API) *GRPCServer {
 	return &GRPCServer{api: api}
+}
+
+// buildGRPCTransactionResponse builds a gRPC transaction response with reads, writes, and endorsements
+func (s *GRPCServer) buildGRPCTransactionResponse(ctx context.Context, tx dbsqlc.Transaction, limitWrites, offsetWrites int32) *pb.TransactionWithWrites {
+	reads, _ := s.api.q.GetReadsByTx(ctx, dbsqlc.GetReadsByTxParams{
+		BlockNum: tx.BlockNum,
+		TxNum:    tx.TxNum,
+	})
+
+	endorsements, _ := s.api.q.GetEndorsementsByTx(ctx, dbsqlc.GetEndorsementsByTxParams{
+		BlockNum: tx.BlockNum,
+		TxNum:    tx.TxNum,
+	})
+
+	writes, _ := s.api.q.GetWritesByTx(ctx, dbsqlc.GetWritesByTxParams{
+		BlockNum: tx.BlockNum,
+		TxNum:    tx.TxNum,
+		Limit:    limitWrites,
+		Offset:   offsetWrites,
+	})
+
+	txResp := &pb.TransactionWithWrites{
+		Id:             tx.ID,
+		TxNum:          tx.TxNum,
+		TxId:           hex.EncodeToString(tx.TxID),
+		ValidationCode: tx.ValidationCode,
+		Reads:          make([]*pb.ReadRecord, 0, len(reads)),
+		Writes:         make([]*pb.WriteRecord, 0, len(writes)),
+		Endorsements:   make([]*pb.EndorsementRecord, 0, len(endorsements)),
+	}
+
+	for _, r := range reads {
+		txResp.Reads = append(txResp.Reads, &pb.ReadRecord{
+			Id:          r.ID,
+			NsId:        r.NsID,
+			Key:         hex.EncodeToString(r.Key),
+			Version:     util.NullableInt64ToPtr(r.Version),
+			IsReadWrite: r.IsReadWrite,
+		})
+	}
+
+	for _, w := range writes {
+		txResp.Writes = append(txResp.Writes, &pb.WriteRecord{
+			Id:           w.ID,
+			NsId:         w.NsID,
+			Key:          hex.EncodeToString(w.Key),
+			Value:        hex.EncodeToString(w.Value),
+			IsBlindWrite: w.IsBlindWrite,
+			ReadVersion:  util.NullableInt64ToPtr(w.ReadVersion),
+		})
+	}
+
+	for _, e := range endorsements {
+		var identity *string
+		if len(e.Identity) > 0 {
+			id := string(e.Identity)
+			identity = &id
+		}
+		txResp.Endorsements = append(txResp.Endorsements, &pb.EndorsementRecord{
+			Id:          e.ID,
+			NsId:        e.NsID,
+			Endorsement: hex.EncodeToString(e.Endorsement),
+			MspId:       util.NullableStringToPtr(e.MspID),
+			Identity:    identity,
+		})
+	}
+
+	return txResp
 }
 
 // GetBlockHeight returns the current block height
@@ -44,13 +114,13 @@ func (s *GRPCServer) GetBlock(ctx context.Context, req *pb.GetBlockRequest) (*pb
 
 	limitTx := req.LimitTx
 	if limitTx == 0 {
-		limitTx = 100
+		limitTx = constants.DefaultTxLimit
 	}
 	offsetTx := req.OffsetTx
 
 	limitWrites := req.LimitWrites
 	if limitWrites == 0 {
-		limitWrites = 1000
+		limitWrites = constants.DefaultWriteLimit
 	}
 	offsetWrites := req.OffsetWrites
 
@@ -77,81 +147,7 @@ func (s *GRPCServer) GetBlock(ctx context.Context, req *pb.GetBlockRequest) (*pb
 	}
 
 	for _, tx := range txs {
-		reads, _ := s.api.q.GetReadsByTx(ctx, dbsqlc.GetReadsByTxParams{
-			BlockNum: tx.BlockNum,
-			TxNum:    tx.TxNum,
-		})
-
-		endorsements, _ := s.api.q.GetEndorsementsByTx(ctx, dbsqlc.GetEndorsementsByTxParams{
-			BlockNum: tx.BlockNum,
-			TxNum:    tx.TxNum,
-		})
-
-		writes, _ := s.api.q.GetWritesByTx(ctx, dbsqlc.GetWritesByTxParams{
-			BlockNum: tx.BlockNum,
-			TxNum:    tx.TxNum,
-			Limit:    limitWrites,
-			Offset:   offsetWrites,
-		})
-
-		txResp := &pb.TransactionWithWrites{
-			Id:             tx.ID,
-			TxNum:          tx.TxNum,
-			TxId:           hex.EncodeToString(tx.TxID),
-			ValidationCode: tx.ValidationCode,
-			Reads:          make([]*pb.ReadRecord, 0, len(reads)),
-			Writes:         make([]*pb.WriteRecord, 0, len(writes)),
-			Endorsements:   make([]*pb.EndorsementRecord, 0, len(endorsements)),
-		}
-
-		for _, r := range reads {
-			var version *int64
-			if r.Version.Valid {
-				version = &r.Version.Int64
-			}
-			txResp.Reads = append(txResp.Reads, &pb.ReadRecord{
-				Id:          r.ID,
-				NsId:        r.NsID,
-				Key:         hex.EncodeToString(r.Key),
-				Version:     version,
-				IsReadWrite: r.IsReadWrite,
-			})
-		}
-
-		for _, w := range writes {
-			var readVersion *int64
-			if w.ReadVersion.Valid {
-				readVersion = &w.ReadVersion.Int64
-			}
-			txResp.Writes = append(txResp.Writes, &pb.WriteRecord{
-				Id:           w.ID,
-				NsId:         w.NsID,
-				Key:          hex.EncodeToString(w.Key),
-				Value:        hex.EncodeToString(w.Value),
-				IsBlindWrite: w.IsBlindWrite,
-				ReadVersion:  readVersion,
-			})
-		}
-
-		for _, e := range endorsements {
-			var mspID *string
-			if e.MspID.Valid {
-				mspID = &e.MspID.String
-			}
-			var identity *string
-			if len(e.Identity) > 0 {
-				id := string(e.Identity)
-				identity = &id
-			}
-			txResp.Endorsements = append(txResp.Endorsements, &pb.EndorsementRecord{
-				Id:          e.ID,
-				NsId:        e.NsID,
-				Endorsement: hex.EncodeToString(e.Endorsement),
-				MspId:       mspID,
-				Identity:    identity,
-			})
-		}
-
+		txResp := s.buildGRPCTransactionResponse(ctx, tx, limitWrites, offsetWrites)
 		resp.Transactions = append(resp.Transactions, txResp)
 	}
 
@@ -175,83 +171,8 @@ func (s *GRPCServer) GetTransaction(ctx context.Context, req *pb.GetTransactionR
 		return nil, status.Errorf(codes.Internal, "failed to get block: %v", err)
 	}
 
-	reads, _ := s.api.q.GetReadsByTx(ctx, dbsqlc.GetReadsByTxParams{
-		BlockNum: tx.BlockNum,
-		TxNum:    tx.TxNum,
-	})
-
-	endorsements, _ := s.api.q.GetEndorsementsByTx(ctx, dbsqlc.GetEndorsementsByTxParams{
-		BlockNum: tx.BlockNum,
-		TxNum:    tx.TxNum,
-	})
-
-	writes, _ := s.api.q.GetWritesByTx(ctx, dbsqlc.GetWritesByTxParams{
-		BlockNum: tx.BlockNum,
-		TxNum:    tx.TxNum,
-		Limit:    1000,
-		Offset:   0,
-	})
-
-	txResp := &pb.TransactionWithWrites{
-		Id:             tx.ID,
-		TxNum:          tx.TxNum,
-		TxId:           hex.EncodeToString(tx.TxID),
-		ValidationCode: tx.ValidationCode,
-		Reads:          make([]*pb.ReadRecord, 0, len(reads)),
-		Writes:         make([]*pb.WriteRecord, 0, len(writes)),
-		Endorsements:   make([]*pb.EndorsementRecord, 0, len(endorsements)),
-	}
-
-	for _, r := range reads {
-		var version *int64
-		if r.Version.Valid {
-			version = &r.Version.Int64
-		}
-		txResp.Reads = append(txResp.Reads, &pb.ReadRecord{
-			Id:          r.ID,
-			NsId:        r.NsID,
-			Key:         hex.EncodeToString(r.Key),
-			Version:     version,
-			IsReadWrite: r.IsReadWrite,
-		})
-	}
-
-	for _, w := range writes {
-		var readVersion *int64
-		if w.ReadVersion.Valid {
-			readVersion = &w.ReadVersion.Int64
-		}
-		txResp.Writes = append(txResp.Writes, &pb.WriteRecord{
-			Id:           w.ID,
-			NsId:         w.NsID,
-			Key:          hex.EncodeToString(w.Key),
-			Value:        hex.EncodeToString(w.Value),
-			IsBlindWrite: w.IsBlindWrite,
-			ReadVersion:  readVersion,
-		})
-	}
-
-	for _, e := range endorsements {
-		var mspID *string
-		if e.MspID.Valid {
-			mspID = &e.MspID.String
-		}
-		var identity *string
-		if len(e.Identity) > 0 {
-			id := string(e.Identity)
-			identity = &id
-		}
-		txResp.Endorsements = append(txResp.Endorsements, &pb.EndorsementRecord{
-			Id:          e.ID,
-			NsId:        e.NsID,
-			Endorsement: hex.EncodeToString(e.Endorsement),
-			MspId:       mspID,
-			Identity:    identity,
-		})
-	}
-
 	return &pb.TransactionResponse{
-		Transaction: txResp,
+		Transaction: s.buildGRPCTransactionResponse(ctx, tx, 1000, 0),
 		Block: &pb.BlockHeader{
 			BlockNum:     block.BlockNum,
 			TxCount:      block.TxCount,

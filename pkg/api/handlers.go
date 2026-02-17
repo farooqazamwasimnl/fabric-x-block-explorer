@@ -14,18 +14,21 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/constants"
 	dbsqlc "github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/db/sqlc"
+	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/logging"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/types"
+	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/util"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// API exposes database-backed HTTP handlers.
 type API struct {
 	q    *dbsqlc.Queries
 	pool *pgxpool.Pool
 }
 
-// NewAPI constructs an API instance from a *pgxpool.Pool.
+var logger = logging.New("api")
+
 func NewAPI(pool *pgxpool.Pool) *API {
 	return &API{
 		q:    dbsqlc.New(pool),
@@ -33,13 +36,11 @@ func NewAPI(pool *pgxpool.Pool) *API {
 	}
 }
 
-// writeJSON writes v as JSON to the ResponseWriter and sets Content-Type.
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-// writeError writes an HTTP error with a message and status code.
 func writeError(w http.ResponseWriter, msg string, code int) {
 	http.Error(w, msg, code)
 }
@@ -58,15 +59,21 @@ func (a *API) GetBlockHeight(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) GetBlockByNumber(w http.ResponseWriter, r *http.Request) {
 	blockNumStr := r.PathValue("block_num")
-	blockNum, _ := strconv.ParseInt(blockNumStr, 10, 64)
+	blockNum, err := strconv.ParseInt(blockNumStr, 10, 64)
+	if err != nil {
+		logger.Warnf("invalid block number: %v", err)
+		writeError(w, "invalid block number", http.StatusBadRequest)
+		return
+	}
 
-	limitTx := parseInt(r, "limitTx", 100)
-	offsetTx := parseInt(r, "offsetTx", 0)
-	limitWrites := parseInt(r, "limitWrites", 1000)
-	offsetWrites := parseInt(r, "offsetWrites", 0)
+	limitTx := parseInt(r, "limitTx", constants.DefaultTxLimit)
+	offsetTx := parseInt(r, "offsetTx", constants.DefaultTxOffset)
+	limitWrites := parseInt(r, "limitWrites", constants.DefaultWriteLimit)
+	offsetWrites := parseInt(r, "offsetWrites", constants.DefaultWriteOffset)
 
 	block, err := a.q.GetBlock(r.Context(), blockNum)
 	if err != nil {
+		logger.Errorf("failed to get block %d: %v", blockNum, err)
 		writeError(w, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -77,6 +84,7 @@ func (a *API) GetBlockByNumber(w http.ResponseWriter, r *http.Request) {
 		Offset:   int32(offsetTx),
 	})
 	if err != nil {
+		logger.Errorf("failed to get transactions for block %d: %v", blockNum, err)
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -89,77 +97,7 @@ func (a *API) GetBlockByNumber(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, tx := range txs {
-		reads, _ := a.q.GetReadsByTx(r.Context(), dbsqlc.GetReadsByTxParams{
-			BlockNum: tx.BlockNum,
-			TxNum:    tx.TxNum,
-		})
-
-		endorsements, _ := a.q.GetEndorsementsByTx(r.Context(), dbsqlc.GetEndorsementsByTxParams{
-			BlockNum: tx.BlockNum,
-			TxNum:    tx.TxNum,
-		})
-
-		writes, _ := a.q.GetWritesByTx(r.Context(), dbsqlc.GetWritesByTxParams{
-			BlockNum: tx.BlockNum,
-			TxNum:    tx.TxNum,
-			Limit:    int32(limitWrites),
-			Offset:   int32(offsetWrites),
-		})
-
-		txResp := types.TransactionWithWriteSets{
-			ID:             tx.ID,
-			TxNum:          tx.TxNum,
-			TxID:           hex.EncodeToString(tx.TxID),
-			ValidationCode: tx.ValidationCode,
-		}
-
-		for _, rrec := range reads {
-			var version *int64
-			if rrec.Version.Valid {
-				version = &rrec.Version.Int64
-			}
-			txResp.Reads = append(txResp.Reads, types.ReadRecordResponse{
-				ID:          rrec.ID,
-				NsID:        rrec.NsID,
-				Key:         hex.EncodeToString(rrec.Key),
-				Version:     version,
-				IsReadWrite: rrec.IsReadWrite,
-			})
-		}
-
-		for _, wrec := range writes {
-			var readVersion *int64
-			if wrec.ReadVersion.Valid {
-				readVersion = &wrec.ReadVersion.Int64
-			}
-			txResp.Writes = append(txResp.Writes, types.WriteRecordResponse{
-				ID:           wrec.ID,
-				NsID:         wrec.NsID,
-				Key:          hex.EncodeToString(wrec.Key),
-				Value:        hex.EncodeToString(wrec.Value),
-				IsBlindWrite: wrec.IsBlindWrite,
-				ReadVersion:  readVersion,
-			})
-		}
-
-		for _, erec := range endorsements {
-			var mspID *string
-			if erec.MspID.Valid {
-				mspID = &erec.MspID.String
-			}
-			var identity json.RawMessage
-			if len(erec.Identity) > 0 {
-				identity = json.RawMessage(erec.Identity)
-			}
-			txResp.Endorsements = append(txResp.Endorsements, types.EndorsementResponse{
-				ID:          erec.ID,
-				NsID:        erec.NsID,
-				Endorsement: hex.EncodeToString(erec.Endorsement),
-				MspID:       mspID,
-				Identity:    identity,
-			})
-		}
-
+		txResp := a.buildTransactionResponse(r.Context(), tx, limitWrites, offsetWrites)
 		resp.Transactions = append(resp.Transactions, txResp)
 	}
 
@@ -170,42 +108,27 @@ func (a *API) GetTxByID(w http.ResponseWriter, r *http.Request) {
 	txHex := r.PathValue("tx_id_hex")
 	txBytes, err := hex.DecodeString(txHex)
 	if err != nil {
+		logger.Warnf("invalid tx_id hex: %v", err)
 		writeError(w, "invalid tx_id hex", http.StatusBadRequest)
 		return
 	}
 
 	tx, err := a.q.GetTransactionByTxID(r.Context(), txBytes)
 	if err != nil {
+		logger.Warnf("transaction %s not found: %v", txHex, err)
 		writeError(w, "not found", http.StatusNotFound)
 		return
 	}
 
-	block, _ := a.q.GetBlock(r.Context(), tx.BlockNum)
-
-	reads, _ := a.q.GetReadsByTx(r.Context(), dbsqlc.GetReadsByTxParams{
-		BlockNum: tx.BlockNum,
-		TxNum:    tx.TxNum,
-	})
-
-	endorsements, _ := a.q.GetEndorsementsByTx(r.Context(), dbsqlc.GetEndorsementsByTxParams{
-		BlockNum: tx.BlockNum,
-		TxNum:    tx.TxNum,
-	})
-
-	writes, _ := a.q.GetWritesByTx(r.Context(), dbsqlc.GetWritesByTxParams{
-		BlockNum: tx.BlockNum,
-		TxNum:    tx.TxNum,
-		Limit:    1000,
-		Offset:   0,
-	})
+	block, err := a.q.GetBlock(r.Context(), tx.BlockNum)
+	if err != nil {
+		logger.Errorf("failed to get block %d for tx %s: %v", tx.BlockNum, txHex, err)
+		writeError(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 
 	resp := types.TxWithBlockResponse{
-		Transaction: types.TransactionWithWriteSets{
-			ID:             tx.ID,
-			TxNum:          tx.TxNum,
-			TxID:           hex.EncodeToString(tx.TxID),
-			ValidationCode: tx.ValidationCode,
-		},
+		Transaction: a.buildTransactionResponse(r.Context(), tx, 1000, 0),
 		Block: types.BlockHeaderOnly{
 			BlockNum:     block.BlockNum,
 			TxCount:      block.TxCount,
@@ -214,58 +137,85 @@ func (a *API) GetTxByID(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	writeJSON(w, resp)
+}
+
+func (a *API) buildTransactionResponse(ctx context.Context, tx dbsqlc.Transaction, limitWrites, offsetWrites int) types.TransactionWithWriteSets {
+	reads, _ := a.q.GetReadsByTx(ctx, dbsqlc.GetReadsByTxParams{
+		BlockNum: tx.BlockNum,
+		TxNum:    tx.TxNum,
+	})
+
+	endorsements, _ := a.q.GetEndorsementsByTx(ctx, dbsqlc.GetEndorsementsByTxParams{
+		BlockNum: tx.BlockNum,
+		TxNum:    tx.TxNum,
+	})
+
+	writes, _ := a.q.GetWritesByTx(ctx, dbsqlc.GetWritesByTxParams{
+		BlockNum: tx.BlockNum,
+		TxNum:    tx.TxNum,
+		Limit:    int32(limitWrites),
+		Offset:   int32(offsetWrites),
+	})
+
+	txResp := types.TransactionWithWriteSets{
+		ID:             tx.ID,
+		TxNum:          tx.TxNum,
+		TxID:           hex.EncodeToString(tx.TxID),
+		ValidationCode: tx.ValidationCode,
+	}
+
 	for _, rrec := range reads {
-		var version *int64
-		if rrec.Version.Valid {
-			version = &rrec.Version.Int64
-		}
-		resp.Transaction.Reads = append(resp.Transaction.Reads, types.ReadRecordResponse{
+		txResp.Reads = append(txResp.Reads, types.ReadRecordResponse{
 			ID:          rrec.ID,
 			NsID:        rrec.NsID,
 			Key:         hex.EncodeToString(rrec.Key),
-			Version:     version,
+			Version:     util.NullableInt64ToPtr(rrec.Version),
 			IsReadWrite: rrec.IsReadWrite,
 		})
 	}
 
 	for _, wrec := range writes {
-		var readVersion *int64
-		if wrec.ReadVersion.Valid {
-			readVersion = &wrec.ReadVersion.Int64
-		}
-		resp.Transaction.Writes = append(resp.Transaction.Writes, types.WriteRecordResponse{
+		txResp.Writes = append(txResp.Writes, types.WriteRecordResponse{
 			ID:           wrec.ID,
 			NsID:         wrec.NsID,
 			Key:          hex.EncodeToString(wrec.Key),
 			Value:        hex.EncodeToString(wrec.Value),
 			IsBlindWrite: wrec.IsBlindWrite,
-			ReadVersion:  readVersion,
+			ReadVersion:  util.NullableInt64ToPtr(wrec.ReadVersion),
 		})
 	}
 
 	for _, erec := range endorsements {
-		var mspID *string
-		if erec.MspID.Valid {
-			mspID = &erec.MspID.String
-		}
 		var identity json.RawMessage
 		if len(erec.Identity) > 0 {
 			identity = json.RawMessage(erec.Identity)
 		}
-		resp.Transaction.Endorsements = append(resp.Transaction.Endorsements, types.EndorsementResponse{
+		txResp.Endorsements = append(txResp.Endorsements, types.EndorsementResponse{
 			ID:          erec.ID,
 			NsID:        erec.NsID,
 			Endorsement: hex.EncodeToString(erec.Endorsement),
-			MspID:       mspID,
+			MspID:       util.NullableStringToPtr(erec.MspID),
 			Identity:    identity,
 		})
 	}
 
-	writeJSON(w, resp)
+	return txResp
+}
+
+func parseInt(r *http.Request, key string, def int) int {
+	v := r.URL.Query().Get(key)
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return def
+	}
+	return n
 }
 
 // GetNamespacePolicies returns policy versions for a namespace.
-// Optional query param: latest=true to return only the most recent policy.
 func (a *API) GetNamespacePolicies(w http.ResponseWriter, r *http.Request) {
 	ns := r.PathValue("namespace")
 	latest := r.URL.Query().Get("latest") == "true"
@@ -292,38 +242,21 @@ func (a *API) GetNamespacePolicies(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, resp)
 }
 
-
-func parseInt(r *http.Request, key string, def int) int {
-	v := r.URL.Query().Get(key)
-	if v == "" {
-		return def
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil {
-		return def
-	}
-	return n
-}
-
 // GetBlockHeightValue returns the current block height as an int64.
 func (a *API) GetBlockHeightValue(ctx context.Context) (int64, error) {
 	h, err := a.q.GetBlockHeight(ctx)
 	if err != nil {
 		return 0, err
 	}
-	height := h.(int64)
-	return height, nil
+	return h.(int64), nil
 }
 
-// HealthResponse is the JSON payload returned by the health endpoint.
 type HealthResponse struct {
 	Status  string `json:"status"`
 	Details string `json:"details,omitempty"`
 }
 
 // HealthHandler implements a combined liveness/readiness check.
-// - Liveness: returns 200 if the process is running.
-// - Readiness: attempts a short DB ping; if DB is unreachable returns 503.
 func (a *API) HealthHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()

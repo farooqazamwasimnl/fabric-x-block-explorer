@@ -9,13 +9,15 @@ package blockpipeline
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
+	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/logging"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/sidecarstream"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/hyperledger/fabric-protos-go-apiv2/common"
 )
+
+var receiverLogger = logging.New("block-receiver")
 
 // BlockReceiver starts a long-running loop that connects to the Sidecar stream,
 // forwards received Fabric blocks to the 'out' channel and handles reconnection
@@ -27,36 +29,36 @@ func BlockReceiver(ctx context.Context, streamer *sidecarstream.Streamer, out ch
 		}
 	}()
 
-	log.Println("blockReceiver started")
+	receiverLogger.Info("blockReceiver started")
 	backoffObj := NewBackoff()
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("blockreceiver stopping")
+			receiverLogger.Info("blockreceiver stopping")
 			return
 		default:
 		}
 
 		blockCh := make(chan *common.Block, channelSize)
 
-		log.Println("blockreceiver: starting Sidecar stream")
+		receiverLogger.Info("blockreceiver: starting Sidecar stream")
 		streamer.StartDeliver(ctx, blockCh)
 		backoffObj.Reset()
 
 		if err := consumeBlocks(ctx, blockCh, out); err != nil {
-			log.Printf("blockreceiver stream error: %v", err)
+			receiverLogger.Warnf("blockreceiver stream error: %v", err)
 		}
 
 		wait := backoffObj.NextBackOff()
 		if wait == backoff.Stop {
 			wait = 30 * time.Second
 		}
-		log.Printf("blockreceiver: reconnecting after %v", wait)
+		receiverLogger.Infof("blockreceiver: reconnecting after %v", wait)
 
 		select {
 		case <-ctx.Done():
-			log.Println("blockreceiver stopping before reconnect")
+			receiverLogger.Info("blockreceiver stopping before reconnect")
 			return
 		case <-time.After(wait):
 		}

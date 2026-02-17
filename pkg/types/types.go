@@ -6,36 +6,15 @@ SPDX-License-Identifier: Apache-2.0
 
 package types
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type ProcessedBlock struct {
 	Number    uint64
 	Txns      int
 	Data      any
 	BlockInfo *BlockInfo
-}
-
-// ReadWriteSet is the outcome of an optimistically executed transaction.
-type ReadWriteSet struct {
-	Reads  []KVRead
-	Writes []KVWrite
-}
-
-type KVRead struct {
-	Key         string
-	Version     *Version
-	IsReadWrite bool
-}
-
-type KVWrite struct {
-	Key          string
-	Value        []byte
-	IsBlindWrite bool
-	ReadVersion  *uint64
-}
-
-type Version struct {
-	BlockNum uint64
 }
 
 // WriteRecord represents a single write or delete in the world state.
@@ -49,23 +28,6 @@ type WriteRecord struct {
 	ValidationCode int32
 	IsBlindWrite   bool
 	ReadVersion    *uint64
-}
-
-func Records(namespace string, blockNum, txNum uint64, txID string, rws ReadWriteSet) []WriteRecord {
-	rec := make([]WriteRecord, len(rws.Writes))
-	for i, w := range rws.Writes {
-		rec[i] = WriteRecord{
-			Namespace:    namespace,
-			BlockNum:     blockNum,
-			TxNum:        txNum,
-			TxID:         txID,
-			Key:          w.Key,
-			Value:        w.Value,
-			IsBlindWrite: w.IsBlindWrite,
-			ReadVersion:  w.ReadVersion,
-		}
-	}
-	return rec
 }
 
 type BlockInfo struct {
@@ -86,12 +48,12 @@ type TxNamespaceRecord struct {
 
 // ReadRecord represents a single read operation in a transaction.
 type ReadRecord struct {
-	BlockNum      uint64
-	TxNum         uint64
-	NsID          string
-	Key           string
-	Version       *uint64
-	IsReadWrite   bool
+	BlockNum    uint64
+	TxNum       uint64
+	NsID        string
+	Key         string
+	Version     *uint64
+	IsReadWrite bool
 }
 
 // EndorsementRecord represents a signature endorsement per namespace.

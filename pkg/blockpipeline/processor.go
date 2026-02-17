@@ -9,22 +9,24 @@ package blockpipeline
 import (
 	"context"
 	"fmt"
-	"log"
 
+	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/logging"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/parser"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/types"
 	"github.com/hyperledger/fabric-protos-go-apiv2/common"
 )
 
+var logger = logging.New("blockpipeline")
+
 // BlockProcessor reads raw blocks from 'in', processes them and sends
 // processed blocks to 'out'. Any fatal error is reported on errCh.
 func BlockProcessor(ctx context.Context, in <-chan *common.Block, out chan<- *types.ProcessedBlock, errCh chan<- error) {
-	log.Println("blockProcessor started")
+	logger.Info("blockProcessor started")
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("blockProcessor stopping")
+			logger.Info("blockProcessor stopping")
 			return
 
 		case blk, ok := <-in:
@@ -44,7 +46,7 @@ func BlockProcessor(ctx context.Context, in <-chan *common.Block, out chan<- *ty
 
 			select {
 			case <-ctx.Done():
-				log.Println("blockProcessor stopping before send")
+				logger.Info("blockProcessor stopping before send")
 				return
 			case out <- processed:
 			}

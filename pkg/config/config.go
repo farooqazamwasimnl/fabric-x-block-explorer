@@ -7,6 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 package config
 
 import (
+	"errors"
 	"os"
 	"strconv"
 
@@ -49,11 +50,49 @@ type ServerConfig struct {
 }
 
 type Config struct {
-	DB      DBConfig    `yaml:"database"`
+	DB      DBConfig      `yaml:"database"`
 	Sidecar SidecarConfig `yaml:"sidecar"`
-	Buffer  BufferConfig `yaml:"buffer"`
-	Workers WorkerConfig `yaml:"workers"`
-	Server  ServerConfig `yaml:"server"`
+	Buffer  BufferConfig  `yaml:"buffer"`
+	Workers WorkerConfig  `yaml:"workers"`
+	Server  ServerConfig  `yaml:"server"`
+}
+
+// Validate checks if the configuration is valid
+func (c *Config) Validate() error {
+	if c.DB.Host == "" {
+		return errors.New("database host is required")
+	}
+	if c.DB.Port <= 0 || c.DB.Port > 65535 {
+		return errors.New("database port must be between 1 and 65535")
+	}
+	if c.DB.User == "" {
+		return errors.New("database user is required")
+	}
+	if c.DB.DBName == "" {
+		return errors.New("database name is required")
+	}
+	if c.Sidecar.Host == "" {
+		return errors.New("sidecar host is required")
+	}
+	if c.Sidecar.Port <= 0 || c.Sidecar.Port > 65535 {
+		return errors.New("sidecar port must be between 1 and 65535")
+	}
+	if c.Sidecar.ChannelID == "" {
+		return errors.New("sidecar channel ID is required")
+	}
+	if c.Server.HTTPAddr == "" {
+		return errors.New("server HTTP address is required")
+	}
+	if c.Server.GRPCAddr == "" {
+		return errors.New("server gRPC address is required")
+	}
+	if c.Workers.ProcessorCount <= 0 {
+		return errors.New("processor count must be greater than 0")
+	}
+	if c.Workers.WriterCount <= 0 {
+		return errors.New("writer count must be greater than 0")
+	}
+	return nil
 }
 
 // Load reads configuration from config.yaml if it exists, otherwise from environment variables.

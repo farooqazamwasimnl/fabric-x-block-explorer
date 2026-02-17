@@ -8,20 +8,23 @@ package app
 
 import (
 	"context"
-	"log"
 	"net"
 	"net/http"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/api"
 	pb "github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/api/proto"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/config"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/db"
+	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/logging"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/sidecarstream"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/workerpool"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
+
+var logger = logging.New("app")
 
 // Server manages the block explorer application components.
 type Server struct {
@@ -36,6 +39,11 @@ type Server struct {
 
 // New creates a new Server instance.
 func New(cfg *config.Config) (*Server, error) {
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
 	// Initialize database
 	pool, err := db.NewPostgres(db.Config{
 		Host:     cfg.DB.Host,
@@ -62,13 +70,14 @@ func New(cfg *config.Config) (*Server, error) {
 	grpcServer := grpc.NewServer()
 	grpcHandler := api.NewGRPCServer(apiServer)
 	pb.RegisterBlockExplorerServer(grpcServer, grpcHandler)
+	reflection.Register(grpcServer)
 
 	// Query current block height and adjust sidecar start block if needed
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	currentBlockHeight, err := apiServer.GetBlockHeightValue(ctx)
 	if err != nil {
-		log.Printf("warning: could not get block height: %v", err)
+		logger.Warnf("warning: could not get block height: %v", err)
 	} else if currentBlockHeight > 0 {
 		cfg.Sidecar.StartBlk = uint64(currentBlockHeight) + 1
 	}
@@ -109,7 +118,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	// Start HTTP server
 	go func() {
-		log.Printf("REST API running on %s", s.httpServer.Addr)
+		logger.Infof("REST API running on %s", s.httpServer.Addr)
 		if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			select {
 			case httpErrCh <- err:
@@ -128,7 +137,7 @@ func (s *Server) Run(ctx context.Context) error {
 			}
 			return
 		}
-		log.Printf("gRPC API running on %s", s.config.Server.GRPCAddr)
+		logger.Infof("gRPC API running on %s", s.config.Server.GRPCAddr)
 		if err := s.grpcServer.Serve(lis); err != nil {
 			select {
 			case grpcErrCh <- err:
@@ -143,11 +152,11 @@ func (s *Server) Run(ctx context.Context) error {
 	// Wait for shutdown signal or fatal error
 	select {
 	case <-ctx.Done():
-		log.Println("shutdown requested")
+		logger.Info("shutdown requested")
 	case err := <-httpErrCh:
-		log.Printf("fatal HTTP error: %v", err)
+		logger.Errorf("fatal HTTP error: %v", err)
 	case err := <-grpcErrCh:
-		log.Printf("fatal gRPC error: %v", err)
+		logger.Errorf("fatal gRPC error: %v", err)
 	}
 
 	// Graceful shutdown
@@ -157,9 +166,9 @@ func (s *Server) Run(ctx context.Context) error {
 
 	// Wait for worker pool to finish
 	if err := g.Wait(); err != nil {
-		log.Printf("workerpool exited with error: %v", err)
+		logger.Errorf("workerpool exited with error: %v", err)
 	} else {
-		log.Println("workerpool exited cleanly")
+		logger.Info("workerpool exited cleanly")
 	}
 
 	return nil
@@ -168,9 +177,9 @@ func (s *Server) Run(ctx context.Context) error {
 // Shutdown gracefully shuts down the server components.
 func (s *Server) Shutdown() error {
 	// gRPC server shutdown
-	log.Println("shutting down gRPC server...")
+	logger.Info("shutting down gRPC server...")
 	s.grpcServer.GracefulStop()
-	log.Println("gRPC server shutdown complete")
+	logger.Info("gRPC server shutdown complete")
 
 	// HTTP server shutdown
 	shutdownTimeout := time.Duration(s.config.Server.ShutdownTimeoutSec) * time.Second
@@ -182,9 +191,9 @@ func (s *Server) Shutdown() error {
 	defer shutdownCancel()
 
 	if err := s.httpServer.Shutdown(shutdownCtx); err != nil {
-		log.Printf("http shutdown error: %v", err)
+		logger.Errorf("http shutdown error: %v", err)
 	} else {
-		log.Println("http server shutdown complete")
+		logger.Info("http server shutdown complete")
 	}
 
 	// Database cleanup
