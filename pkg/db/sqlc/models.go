@@ -23,6 +23,14 @@ type Transaction struct {
 	ValidationCode int64  `json:"validation_code"`
 }
 
+type TxEndorsement struct {
+	ID            int64       `json:"id"`
+	TxNamespaceID int64       `json:"tx_namespace_id"`
+	Endorsement   []byte      `json:"endorsement"`
+	MspID         pgtype.Text `json:"msp_id"`
+	Identity      []byte      `json:"identity"`
+}
+
 type TxNamespace struct {
 	ID            int64  `json:"id"`
 	TransactionID int64  `json:"transaction_id"`

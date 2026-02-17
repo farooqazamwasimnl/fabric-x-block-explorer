@@ -11,6 +11,7 @@ import (
 type Querier interface {
 	GetBlock(ctx context.Context, blockNum int64) (Block, error)
 	GetBlockHeight(ctx context.Context) (interface{}, error)
+	GetEndorsementsByTx(ctx context.Context, arg GetEndorsementsByTxParams) ([]GetEndorsementsByTxRow, error)
 	GetReadsByTx(ctx context.Context, arg GetReadsByTxParams) ([]GetReadsByTxRow, error)
 	GetTransactionByTxID(ctx context.Context, txID []byte) (Transaction, error)
 	GetTransactionID(ctx context.Context, arg GetTransactionIDParams) (int64, error)
@@ -18,6 +19,7 @@ type Querier interface {
 	GetWritesByTx(ctx context.Context, arg GetWritesByTxParams) ([]GetWritesByTxRow, error)
 	InsertBlock(ctx context.Context, arg InsertBlockParams) error
 	InsertTransaction(ctx context.Context, arg InsertTransactionParams) (int64, error)
+	InsertTxEndorsement(ctx context.Context, arg InsertTxEndorsementParams) error
 	InsertTxNamespace(ctx context.Context, arg InsertTxNamespaceParams) (int64, error)
 	InsertTxRead(ctx context.Context, arg InsertTxReadParams) error
 	InsertTxWrite(ctx context.Context, arg InsertTxWriteParams) error

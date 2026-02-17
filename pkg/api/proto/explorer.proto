@@ -53,6 +53,7 @@ message TransactionWithWrites {
   int64 validation_code = 4;
   repeated ReadRecord reads = 5;
   repeated WriteRecord writes = 6;
+  repeated EndorsementRecord endorsements = 7;
 }
 
 // ReadRecord contains a single read record
@@ -72,6 +73,15 @@ message WriteRecord {
   string value = 4;
   bool is_blind_write = 5;
   optional int64 read_version = 6;
+}
+
+// EndorsementRecord contains a single endorsement record
+message EndorsementRecord {
+  int64 id = 1;
+  string ns_id = 2;
+  string endorsement = 3;
+  optional string msp_id = 4;
+  optional string identity = 5;
 }
 
 // GetTransactionRequest to fetch transaction by ID

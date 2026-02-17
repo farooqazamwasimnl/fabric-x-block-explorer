@@ -34,7 +34,6 @@ type KVWrite struct {
 
 type Version struct {
 	BlockNum uint64
-	TxNum    uint64
 }
 
 // WriteRecord represents a single write or delete in the world state.
@@ -93,9 +92,20 @@ type ReadRecord struct {
 	IsReadWrite   bool
 }
 
+// EndorsementRecord represents a signature endorsement per namespace.
+type EndorsementRecord struct {
+	BlockNum    uint64
+	TxNum       uint64
+	NsID        string
+	Endorsement []byte
+	MspID       *string
+	Identity    []byte
+}
+
 // ParsedBlockData contains writes, reads, and namespace records.
 type ParsedBlockData struct {
 	Writes       []WriteRecord
 	Reads        []ReadRecord
 	TxNamespaces []TxNamespaceRecord
+	Endorsements []EndorsementRecord
 }

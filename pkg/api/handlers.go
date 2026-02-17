@@ -94,6 +94,11 @@ func (a *API) GetBlockByNumber(w http.ResponseWriter, r *http.Request) {
 			TxNum:    tx.TxNum,
 		})
 
+		endorsements, _ := a.q.GetEndorsementsByTx(r.Context(), dbsqlc.GetEndorsementsByTxParams{
+			BlockNum: tx.BlockNum,
+			TxNum:    tx.TxNum,
+		})
+
 		writes, _ := a.q.GetWritesByTx(r.Context(), dbsqlc.GetWritesByTxParams{
 			BlockNum: tx.BlockNum,
 			TxNum:    tx.TxNum,
@@ -137,6 +142,24 @@ func (a *API) GetBlockByNumber(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 
+		for _, erec := range endorsements {
+			var mspID *string
+			if erec.MspID.Valid {
+				mspID = &erec.MspID.String
+			}
+			var identity json.RawMessage
+			if len(erec.Identity) > 0 {
+				identity = json.RawMessage(erec.Identity)
+			}
+			txResp.Endorsements = append(txResp.Endorsements, types.EndorsementResponse{
+				ID:          erec.ID,
+				NsID:        erec.NsID,
+				Endorsement: hex.EncodeToString(erec.Endorsement),
+				MspID:       mspID,
+				Identity:    identity,
+			})
+		}
+
 		resp.Transactions = append(resp.Transactions, txResp)
 	}
 
@@ -160,6 +183,11 @@ func (a *API) GetTxByID(w http.ResponseWriter, r *http.Request) {
 	block, _ := a.q.GetBlock(r.Context(), tx.BlockNum)
 
 	reads, _ := a.q.GetReadsByTx(r.Context(), dbsqlc.GetReadsByTxParams{
+		BlockNum: tx.BlockNum,
+		TxNum:    tx.TxNum,
+	})
+
+	endorsements, _ := a.q.GetEndorsementsByTx(r.Context(), dbsqlc.GetEndorsementsByTxParams{
 		BlockNum: tx.BlockNum,
 		TxNum:    tx.TxNum,
 	})
@@ -212,6 +240,24 @@ func (a *API) GetTxByID(w http.ResponseWriter, r *http.Request) {
 			Value:        hex.EncodeToString(wrec.Value),
 			IsBlindWrite: wrec.IsBlindWrite,
 			ReadVersion:  readVersion,
+		})
+	}
+
+	for _, erec := range endorsements {
+		var mspID *string
+		if erec.MspID.Valid {
+			mspID = &erec.MspID.String
+		}
+		var identity json.RawMessage
+		if len(erec.Identity) > 0 {
+			identity = json.RawMessage(erec.Identity)
+		}
+		resp.Transaction.Endorsements = append(resp.Transaction.Endorsements, types.EndorsementResponse{
+			ID:          erec.ID,
+			NsID:        erec.NsID,
+			Endorsement: hex.EncodeToString(erec.Endorsement),
+			MspID:       mspID,
+			Identity:    identity,
 		})
 	}
 

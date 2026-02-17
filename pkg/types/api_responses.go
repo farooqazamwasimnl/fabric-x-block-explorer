@@ -6,6 +6,8 @@ SPDX-License-Identifier: Apache-2.0
 
 package types
 
+import "encoding/json"
+
 // ----------------------------
 // API Response Types
 // ----------------------------
@@ -25,6 +27,7 @@ type TransactionWithWriteSets struct {
 	ValidationCode int64                 `json:"validation_code"`
 	Reads          []ReadRecordResponse  `json:"reads"`
 	Writes         []WriteRecordResponse `json:"writes"`
+	Endorsements   []EndorsementResponse `json:"endorsements"`
 }
 
 type ReadRecordResponse struct {
@@ -42,6 +45,14 @@ type WriteRecordResponse struct {
 	Value        string `json:"value"`
 	IsBlindWrite bool   `json:"is_blind_write"`
 	ReadVersion  *int64 `json:"read_version,omitempty"`
+}
+
+type EndorsementResponse struct {
+	ID          int64           `json:"id"`
+	NsID        string          `json:"ns_id"`
+	Endorsement string          `json:"endorsement"`
+	MspID       *string         `json:"msp_id,omitempty"`
+	Identity    json.RawMessage `json:"identity,omitempty"`
 }
 
 type TxWithBlockResponse struct {

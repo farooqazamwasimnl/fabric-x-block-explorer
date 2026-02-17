@@ -38,3 +38,18 @@ CREATE TABLE IF NOT EXISTS tx_writes (
     is_blind_write BOOLEAN NOT NULL DEFAULT FALSE,
     read_version BIGINT
 );
+
+CREATE TABLE IF NOT EXISTS tx_endorsements (
+    id BIGSERIAL PRIMARY KEY,
+    tx_namespace_id BIGINT NOT NULL REFERENCES tx_namespaces(id),
+    endorsement BYTEA NOT NULL,
+    msp_id TEXT,
+    identity JSONB
+);
+
+-- Indexes for foreign key columns to improve JOIN performance
+CREATE INDEX IF NOT EXISTS idx_transactions_block_num ON transactions(block_num);
+CREATE INDEX IF NOT EXISTS idx_tx_namespaces_transaction_id ON tx_namespaces(transaction_id);
+CREATE INDEX IF NOT EXISTS idx_tx_reads_tx_namespace_id ON tx_reads(tx_namespace_id);
+CREATE INDEX IF NOT EXISTS idx_tx_writes_tx_namespace_id ON tx_writes(tx_namespace_id);
+CREATE INDEX IF NOT EXISTS idx_tx_endorsements_tx_namespace_id ON tx_endorsements(tx_namespace_id);

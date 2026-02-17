@@ -8,6 +8,7 @@ package parser
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/types"
 	"github.com/hyperledger/fabric-protos-go-apiv2/common"
@@ -20,6 +21,7 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 	writes := []types.WriteRecord{}
 	reads := []types.ReadRecord{}
 	txNamespaces := []types.TxNamespaceRecord{}
+	endorsements := []types.EndorsementRecord{}
 
 	header := b.GetHeader()
 	if header == nil {
@@ -33,7 +35,7 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 	}
 
 	if b.Metadata == nil || len(b.Metadata.Metadata) <= int(common.BlockMetadataIndex_TRANSACTIONS_FILTER) {
-		return &types.ParsedBlockData{Writes: writes, Reads: reads, TxNamespaces: txNamespaces}, blockInfo, fmt.Errorf("block metadata missing TRANSACTIONS_FILTER")
+		return &types.ParsedBlockData{Writes: writes, Reads: reads, TxNamespaces: txNamespaces, Endorsements: endorsements}, blockInfo, fmt.Errorf("block metadata missing TRANSACTIONS_FILTER")
 	}
 	txFilter := b.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER]
 
@@ -50,14 +52,14 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 		// Unmarshal envelope
 		env := &common.Envelope{}
 		if err := proto.Unmarshal(envBytes, env); err != nil {
-			fmt.Printf("block %d tx %d invalid envelope: %s\n", header.Number, txNum, err)
+			log.Printf("block %d tx %d invalid envelope: %v", header.Number, txNum, err)
 			continue
 		}
 
 		// Extract RW sets
 		rwsets, err := rwSets(env)
 		if err != nil {
-			fmt.Printf("block %d tx %d invalid rwset: %s\n", header.Number, txNum, err)
+			log.Printf("block %d tx %d invalid rwset: %v", header.Number, txNum, err)
 			continue
 		}
 
@@ -72,6 +74,15 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 				ValidationCode: int32(validationCode),
 			}
 			txNamespaces = append(txNamespaces, txNsRecord)
+
+			if len(rw.Endorsement) > 0 {
+				endorsements = append(endorsements, types.EndorsementRecord{
+					BlockNum:    header.Number,
+					TxNum:       uint64(txNum),
+					NsID:        rw.Namespace,
+					Endorsement: rw.Endorsement,
+				})
+			}
 
 			for _, read := range rw.Rwset.Reads {
 				readRecord := types.ReadRecord{
@@ -107,6 +118,7 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 		Writes:       writes,
 		Reads:        reads,
 		TxNamespaces: txNamespaces,
+		Endorsements: endorsements,
 	}, blockInfo, nil
 }
 
@@ -131,7 +143,11 @@ func rwSets(env *common.Envelope) ([]nsRwset, error) {
 		return out, fmt.Errorf("transaction: %w", err)
 	}
 
-	for _, ns := range tx.Namespaces {
+	if len(tx.Signatures) > 0 && len(tx.Signatures) != len(tx.Namespaces) {
+		log.Printf("tx %s signature count %d does not match namespaces %d", txID, len(tx.Signatures), len(tx.Namespaces))
+	}
+
+	for i, ns := range tx.Namespaces {
 		rws := types.ReadWriteSet{
 			Reads:  []types.KVRead{},
 			Writes: []types.KVWrite{},
@@ -175,18 +191,27 @@ func rwSets(env *common.Envelope) ([]nsRwset, error) {
 			})
 		}
 
+		var endorsement []byte
+		if i < len(tx.Signatures) {
+			endorsement = tx.Signatures[i]
+		}
+
 		out = append(out, nsRwset{
-			Namespace: ns.NsId,
-			Rwset:     rws,
-			TxID:      txID,			NsVersion: ns.NsVersion,		})
+			Namespace:   ns.NsId,
+			Rwset:       rws,
+			TxID:        txID,
+			NsVersion:   ns.NsVersion,
+			Endorsement: endorsement,
+		})
 	}
 
 	return out, nil
 }
 
 type nsRwset struct {
-	Namespace string             `json:"namespace"`
-	Rwset     types.ReadWriteSet `json:"rwset"`
-	TxID      string             `json:"-"`
-	NsVersion uint64             `json:"-"`
+	Namespace   string             `json:"namespace"`
+	Rwset       types.ReadWriteSet `json:"rwset"`
+	TxID        string             `json:"-"`
+	NsVersion   uint64             `json:"-"`
+	Endorsement []byte             `json:"-"`
 }

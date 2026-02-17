@@ -54,6 +54,7 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 	writes := parsedData.Writes
 	reads := parsedData.Reads
 	txNamespaces := parsedData.TxNamespaces
+	endorsements := parsedData.Endorsements
 
 	var (
 		tx  pgx.Tx
@@ -82,8 +83,8 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 	if err := q.InsertBlock(ctx, dbsqlc.InsertBlockParams{
 		BlockNum:     int64(pb.BlockInfo.Number),
 		TxCount:      int32(pb.Txns),
-		PreviousHash: []byte(pb.BlockInfo.PreviousHash),
-		DataHash:     []byte(pb.BlockInfo.DataHash),
+		PreviousHash: pb.BlockInfo.PreviousHash,
+		DataHash:     pb.BlockInfo.DataHash,
 	}); err != nil {
 		return err
 	}
@@ -143,6 +144,27 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 			Key:           []byte(r.Key),
 			Version:       version,
 			IsReadWrite:   r.IsReadWrite,
+		}); err != nil {
+			return err
+		}
+	}
+
+	// Insert endorsements
+	for _, e := range endorsements {
+		txNsKey := fmt.Sprintf("%d-%d-%s", e.BlockNum, e.TxNum, e.NsID)
+		txNsID := txNsCache[txNsKey]
+
+		var mspID pgtype.Text
+		if e.MspID != nil {
+			mspID.String = *e.MspID
+			mspID.Valid = true
+		}
+
+		if err := q.InsertTxEndorsement(ctx, dbsqlc.InsertTxEndorsementParams{
+			TxNamespaceID: txNsID,
+			Endorsement:   e.Endorsement,
+			MspID:         mspID,
+			Identity:      e.Identity,
 		}); err != nil {
 			return err
 		}

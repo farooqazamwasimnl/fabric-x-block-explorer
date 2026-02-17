@@ -266,6 +266,7 @@ type TransactionWithWrites struct {
 	ValidationCode int64                  `protobuf:"varint,4,opt,name=validation_code,json=validationCode,proto3" json:"validation_code,omitempty"`
 	Reads          []*ReadRecord          `protobuf:"bytes,5,rep,name=reads,proto3" json:"reads,omitempty"`
 	Writes         []*WriteRecord         `protobuf:"bytes,6,rep,name=writes,proto3" json:"writes,omitempty"`
+	Endorsements   []*EndorsementRecord   `protobuf:"bytes,7,rep,name=endorsements,proto3" json:"endorsements,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -338,6 +339,13 @@ func (x *TransactionWithWrites) GetReads() []*ReadRecord {
 func (x *TransactionWithWrites) GetWrites() []*WriteRecord {
 	if x != nil {
 		return x.Writes
+	}
+	return nil
+}
+
+func (x *TransactionWithWrites) GetEndorsements() []*EndorsementRecord {
+	if x != nil {
+		return x.Endorsements
 	}
 	return nil
 }
@@ -504,6 +512,83 @@ func (x *WriteRecord) GetReadVersion() int64 {
 	return 0
 }
 
+// EndorsementRecord contains a single endorsement record
+type EndorsementRecord struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	NsId          string                 `protobuf:"bytes,2,opt,name=ns_id,json=nsId,proto3" json:"ns_id,omitempty"`
+	Endorsement   string                 `protobuf:"bytes,3,opt,name=endorsement,proto3" json:"endorsement,omitempty"`
+	MspId         *string                `protobuf:"bytes,4,opt,name=msp_id,json=mspId,proto3,oneof" json:"msp_id,omitempty"`
+	Identity      *string                `protobuf:"bytes,5,opt,name=identity,proto3,oneof" json:"identity,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EndorsementRecord) Reset() {
+	*x = EndorsementRecord{}
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EndorsementRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EndorsementRecord) ProtoMessage() {}
+
+func (x *EndorsementRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EndorsementRecord.ProtoReflect.Descriptor instead.
+func (*EndorsementRecord) Descriptor() ([]byte, []int) {
+	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *EndorsementRecord) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *EndorsementRecord) GetNsId() string {
+	if x != nil {
+		return x.NsId
+	}
+	return ""
+}
+
+func (x *EndorsementRecord) GetEndorsement() string {
+	if x != nil {
+		return x.Endorsement
+	}
+	return ""
+}
+
+func (x *EndorsementRecord) GetMspId() string {
+	if x != nil && x.MspId != nil {
+		return *x.MspId
+	}
+	return ""
+}
+
+func (x *EndorsementRecord) GetIdentity() string {
+	if x != nil && x.Identity != nil {
+		return *x.Identity
+	}
+	return ""
+}
+
 // GetTransactionRequest to fetch transaction by ID
 type GetTransactionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -514,7 +599,7 @@ type GetTransactionRequest struct {
 
 func (x *GetTransactionRequest) Reset() {
 	*x = GetTransactionRequest{}
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[7]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -526,7 +611,7 @@ func (x *GetTransactionRequest) String() string {
 func (*GetTransactionRequest) ProtoMessage() {}
 
 func (x *GetTransactionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[7]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -539,7 +624,7 @@ func (x *GetTransactionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTransactionRequest.ProtoReflect.Descriptor instead.
 func (*GetTransactionRequest) Descriptor() ([]byte, []int) {
-	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{7}
+	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetTransactionRequest) GetTxId() string {
@@ -560,7 +645,7 @@ type TransactionResponse struct {
 
 func (x *TransactionResponse) Reset() {
 	*x = TransactionResponse{}
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[8]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -572,7 +657,7 @@ func (x *TransactionResponse) String() string {
 func (*TransactionResponse) ProtoMessage() {}
 
 func (x *TransactionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[8]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -585,7 +670,7 @@ func (x *TransactionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransactionResponse.ProtoReflect.Descriptor instead.
 func (*TransactionResponse) Descriptor() ([]byte, []int) {
-	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{8}
+	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *TransactionResponse) GetTransaction() *TransactionWithWrites {
@@ -615,7 +700,7 @@ type BlockHeader struct {
 
 func (x *BlockHeader) Reset() {
 	*x = BlockHeader{}
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[9]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -627,7 +712,7 @@ func (x *BlockHeader) String() string {
 func (*BlockHeader) ProtoMessage() {}
 
 func (x *BlockHeader) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[9]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -640,7 +725,7 @@ func (x *BlockHeader) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockHeader.ProtoReflect.Descriptor instead.
 func (*BlockHeader) Descriptor() ([]byte, []int) {
-	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{9}
+	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *BlockHeader) GetBlockNum() int64 {
@@ -680,7 +765,7 @@ type HealthRequest struct {
 
 func (x *HealthRequest) Reset() {
 	*x = HealthRequest{}
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[10]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -692,7 +777,7 @@ func (x *HealthRequest) String() string {
 func (*HealthRequest) ProtoMessage() {}
 
 func (x *HealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[10]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -705,7 +790,7 @@ func (x *HealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthRequest.ProtoReflect.Descriptor instead.
 func (*HealthRequest) Descriptor() ([]byte, []int) {
-	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{10}
+	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{11}
 }
 
 // HealthResponse contains service health status
@@ -719,7 +804,7 @@ type HealthResponse struct {
 
 func (x *HealthResponse) Reset() {
 	*x = HealthResponse{}
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[11]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -731,7 +816,7 @@ func (x *HealthResponse) String() string {
 func (*HealthResponse) ProtoMessage() {}
 
 func (x *HealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_proto_explorer_proto_msgTypes[11]
+	mi := &file_pkg_api_proto_explorer_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -744,7 +829,7 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
 func (*HealthResponse) Descriptor() ([]byte, []int) {
-	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{11}
+	return file_pkg_api_proto_explorer_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *HealthResponse) GetStatus() string {
@@ -780,14 +865,15 @@ const file_pkg_api_proto_explorer_proto_rawDesc = "" +
 	"\btx_count\x18\x02 \x01(\x05R\atxCount\x12#\n" +
 	"\rprevious_hash\x18\x03 \x01(\tR\fpreviousHash\x12\x1b\n" +
 	"\tdata_hash\x18\x04 \x01(\tR\bdataHash\x12C\n" +
-	"\ftransactions\x18\x05 \x03(\v2\x1f.explorer.TransactionWithWritesR\ftransactions\"\xd7\x01\n" +
+	"\ftransactions\x18\x05 \x03(\v2\x1f.explorer.TransactionWithWritesR\ftransactions\"\x98\x02\n" +
 	"\x15TransactionWithWrites\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x15\n" +
 	"\x06tx_num\x18\x02 \x01(\x03R\x05txNum\x12\x13\n" +
 	"\x05tx_id\x18\x03 \x01(\tR\x04txId\x12'\n" +
 	"\x0fvalidation_code\x18\x04 \x01(\x03R\x0evalidationCode\x12*\n" +
 	"\x05reads\x18\x05 \x03(\v2\x14.explorer.ReadRecordR\x05reads\x12-\n" +
-	"\x06writes\x18\x06 \x03(\v2\x15.explorer.WriteRecordR\x06writes\"\x92\x01\n" +
+	"\x06writes\x18\x06 \x03(\v2\x15.explorer.WriteRecordR\x06writes\x12?\n" +
+	"\fendorsements\x18\a \x03(\v2\x1b.explorer.EndorsementRecordR\fendorsements\"\x92\x01\n" +
 	"\n" +
 	"ReadRecord\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x13\n" +
@@ -804,7 +890,15 @@ const file_pkg_api_proto_explorer_proto_rawDesc = "" +
 	"\x05value\x18\x04 \x01(\tR\x05value\x12$\n" +
 	"\x0eis_blind_write\x18\x05 \x01(\bR\fisBlindWrite\x12&\n" +
 	"\fread_version\x18\x06 \x01(\x03H\x00R\vreadVersion\x88\x01\x01B\x0f\n" +
-	"\r_read_version\",\n" +
+	"\r_read_version\"\xaf\x01\n" +
+	"\x11EndorsementRecord\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x13\n" +
+	"\x05ns_id\x18\x02 \x01(\tR\x04nsId\x12 \n" +
+	"\vendorsement\x18\x03 \x01(\tR\vendorsement\x12\x1a\n" +
+	"\x06msp_id\x18\x04 \x01(\tH\x00R\x05mspId\x88\x01\x01\x12\x1f\n" +
+	"\bidentity\x18\x05 \x01(\tH\x01R\bidentity\x88\x01\x01B\t\n" +
+	"\a_msp_idB\v\n" +
+	"\t_identity\",\n" +
 	"\x15GetTransactionRequest\x12\x13\n" +
 	"\x05tx_id\x18\x01 \x01(\tR\x04txId\"\x85\x01\n" +
 	"\x13TransactionResponse\x12A\n" +
@@ -837,7 +931,7 @@ func file_pkg_api_proto_explorer_proto_rawDescGZIP() []byte {
 	return file_pkg_api_proto_explorer_proto_rawDescData
 }
 
-var file_pkg_api_proto_explorer_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_pkg_api_proto_explorer_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_pkg_api_proto_explorer_proto_goTypes = []any{
 	(*BlockHeightRequest)(nil),    // 0: explorer.BlockHeightRequest
 	(*BlockHeightResponse)(nil),   // 1: explorer.BlockHeightResponse
@@ -846,31 +940,33 @@ var file_pkg_api_proto_explorer_proto_goTypes = []any{
 	(*TransactionWithWrites)(nil), // 4: explorer.TransactionWithWrites
 	(*ReadRecord)(nil),            // 5: explorer.ReadRecord
 	(*WriteRecord)(nil),           // 6: explorer.WriteRecord
-	(*GetTransactionRequest)(nil), // 7: explorer.GetTransactionRequest
-	(*TransactionResponse)(nil),   // 8: explorer.TransactionResponse
-	(*BlockHeader)(nil),           // 9: explorer.BlockHeader
-	(*HealthRequest)(nil),         // 10: explorer.HealthRequest
-	(*HealthResponse)(nil),        // 11: explorer.HealthResponse
+	(*EndorsementRecord)(nil),     // 7: explorer.EndorsementRecord
+	(*GetTransactionRequest)(nil), // 8: explorer.GetTransactionRequest
+	(*TransactionResponse)(nil),   // 9: explorer.TransactionResponse
+	(*BlockHeader)(nil),           // 10: explorer.BlockHeader
+	(*HealthRequest)(nil),         // 11: explorer.HealthRequest
+	(*HealthResponse)(nil),        // 12: explorer.HealthResponse
 }
 var file_pkg_api_proto_explorer_proto_depIdxs = []int32{
 	4,  // 0: explorer.BlockResponse.transactions:type_name -> explorer.TransactionWithWrites
 	5,  // 1: explorer.TransactionWithWrites.reads:type_name -> explorer.ReadRecord
 	6,  // 2: explorer.TransactionWithWrites.writes:type_name -> explorer.WriteRecord
-	4,  // 3: explorer.TransactionResponse.transaction:type_name -> explorer.TransactionWithWrites
-	9,  // 4: explorer.TransactionResponse.block:type_name -> explorer.BlockHeader
-	0,  // 5: explorer.BlockExplorer.GetBlockHeight:input_type -> explorer.BlockHeightRequest
-	2,  // 6: explorer.BlockExplorer.GetBlock:input_type -> explorer.GetBlockRequest
-	7,  // 7: explorer.BlockExplorer.GetTransaction:input_type -> explorer.GetTransactionRequest
-	10, // 8: explorer.BlockExplorer.HealthCheck:input_type -> explorer.HealthRequest
-	1,  // 9: explorer.BlockExplorer.GetBlockHeight:output_type -> explorer.BlockHeightResponse
-	3,  // 10: explorer.BlockExplorer.GetBlock:output_type -> explorer.BlockResponse
-	8,  // 11: explorer.BlockExplorer.GetTransaction:output_type -> explorer.TransactionResponse
-	11, // 12: explorer.BlockExplorer.HealthCheck:output_type -> explorer.HealthResponse
-	9,  // [9:13] is the sub-list for method output_type
-	5,  // [5:9] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	7,  // 3: explorer.TransactionWithWrites.endorsements:type_name -> explorer.EndorsementRecord
+	4,  // 4: explorer.TransactionResponse.transaction:type_name -> explorer.TransactionWithWrites
+	10, // 5: explorer.TransactionResponse.block:type_name -> explorer.BlockHeader
+	0,  // 6: explorer.BlockExplorer.GetBlockHeight:input_type -> explorer.BlockHeightRequest
+	2,  // 7: explorer.BlockExplorer.GetBlock:input_type -> explorer.GetBlockRequest
+	8,  // 8: explorer.BlockExplorer.GetTransaction:input_type -> explorer.GetTransactionRequest
+	11, // 9: explorer.BlockExplorer.HealthCheck:input_type -> explorer.HealthRequest
+	1,  // 10: explorer.BlockExplorer.GetBlockHeight:output_type -> explorer.BlockHeightResponse
+	3,  // 11: explorer.BlockExplorer.GetBlock:output_type -> explorer.BlockResponse
+	9,  // 12: explorer.BlockExplorer.GetTransaction:output_type -> explorer.TransactionResponse
+	12, // 13: explorer.BlockExplorer.HealthCheck:output_type -> explorer.HealthResponse
+	10, // [10:14] is the sub-list for method output_type
+	6,  // [6:10] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_pkg_api_proto_explorer_proto_init() }
@@ -880,13 +976,14 @@ func file_pkg_api_proto_explorer_proto_init() {
 	}
 	file_pkg_api_proto_explorer_proto_msgTypes[5].OneofWrappers = []any{}
 	file_pkg_api_proto_explorer_proto_msgTypes[6].OneofWrappers = []any{}
+	file_pkg_api_proto_explorer_proto_msgTypes[7].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pkg_api_proto_explorer_proto_rawDesc), len(file_pkg_api_proto_explorer_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

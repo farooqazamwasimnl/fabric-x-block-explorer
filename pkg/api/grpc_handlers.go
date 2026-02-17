@@ -82,6 +82,11 @@ func (s *GRPCServer) GetBlock(ctx context.Context, req *pb.GetBlockRequest) (*pb
 			TxNum:    tx.TxNum,
 		})
 
+		endorsements, _ := s.api.q.GetEndorsementsByTx(ctx, dbsqlc.GetEndorsementsByTxParams{
+			BlockNum: tx.BlockNum,
+			TxNum:    tx.TxNum,
+		})
+
 		writes, _ := s.api.q.GetWritesByTx(ctx, dbsqlc.GetWritesByTxParams{
 			BlockNum: tx.BlockNum,
 			TxNum:    tx.TxNum,
@@ -96,6 +101,7 @@ func (s *GRPCServer) GetBlock(ctx context.Context, req *pb.GetBlockRequest) (*pb
 			ValidationCode: tx.ValidationCode,
 			Reads:          make([]*pb.ReadRecord, 0, len(reads)),
 			Writes:         make([]*pb.WriteRecord, 0, len(writes)),
+			Endorsements:   make([]*pb.EndorsementRecord, 0, len(endorsements)),
 		}
 
 		for _, r := range reads {
@@ -127,6 +133,25 @@ func (s *GRPCServer) GetBlock(ctx context.Context, req *pb.GetBlockRequest) (*pb
 			})
 		}
 
+		for _, e := range endorsements {
+			var mspID *string
+			if e.MspID.Valid {
+				mspID = &e.MspID.String
+			}
+			var identity *string
+			if len(e.Identity) > 0 {
+				id := string(e.Identity)
+				identity = &id
+			}
+			txResp.Endorsements = append(txResp.Endorsements, &pb.EndorsementRecord{
+				Id:          e.ID,
+				NsId:        e.NsID,
+				Endorsement: hex.EncodeToString(e.Endorsement),
+				MspId:       mspID,
+				Identity:    identity,
+			})
+		}
+
 		resp.Transactions = append(resp.Transactions, txResp)
 	}
 
@@ -155,6 +180,11 @@ func (s *GRPCServer) GetTransaction(ctx context.Context, req *pb.GetTransactionR
 		TxNum:    tx.TxNum,
 	})
 
+	endorsements, _ := s.api.q.GetEndorsementsByTx(ctx, dbsqlc.GetEndorsementsByTxParams{
+		BlockNum: tx.BlockNum,
+		TxNum:    tx.TxNum,
+	})
+
 	writes, _ := s.api.q.GetWritesByTx(ctx, dbsqlc.GetWritesByTxParams{
 		BlockNum: tx.BlockNum,
 		TxNum:    tx.TxNum,
@@ -169,6 +199,7 @@ func (s *GRPCServer) GetTransaction(ctx context.Context, req *pb.GetTransactionR
 		ValidationCode: tx.ValidationCode,
 		Reads:          make([]*pb.ReadRecord, 0, len(reads)),
 		Writes:         make([]*pb.WriteRecord, 0, len(writes)),
+		Endorsements:   make([]*pb.EndorsementRecord, 0, len(endorsements)),
 	}
 
 	for _, r := range reads {
@@ -197,6 +228,25 @@ func (s *GRPCServer) GetTransaction(ctx context.Context, req *pb.GetTransactionR
 			Value:        hex.EncodeToString(w.Value),
 			IsBlindWrite: w.IsBlindWrite,
 			ReadVersion:  readVersion,
+		})
+	}
+
+	for _, e := range endorsements {
+		var mspID *string
+		if e.MspID.Valid {
+			mspID = &e.MspID.String
+		}
+		var identity *string
+		if len(e.Identity) > 0 {
+			id := string(e.Identity)
+			identity = &id
+		}
+		txResp.Endorsements = append(txResp.Endorsements, &pb.EndorsementRecord{
+			Id:          e.ID,
+			NsId:        e.NsID,
+			Endorsement: hex.EncodeToString(e.Endorsement),
+			MspId:       mspID,
+			Identity:    identity,
 		})
 	}
 
