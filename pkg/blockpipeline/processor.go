@@ -29,12 +29,10 @@ func BlockProcessor(ctx context.Context, in <-chan *common.Block, out chan<- *ty
 
 		case blk, ok := <-in:
 			if !ok {
-				// Input channel closed unexpectedly.
 				errCh <- fmt.Errorf("receivedBlocks channel closed")
 				return
 			}
 			if blk == nil {
-				// Skip nil blocks.
 				continue
 			}
 
@@ -44,7 +42,6 @@ func BlockProcessor(ctx context.Context, in <-chan *common.Block, out chan<- *ty
 				return
 			}
 
-			// Respect context cancellation while attempting to send.
 			select {
 			case <-ctx.Done():
 				log.Println("blockProcessor stopping before send")
@@ -60,7 +57,7 @@ func processBlock(blk *common.Block) (*types.ProcessedBlock, error) {
 	number := blk.GetHeader().GetNumber()
 	txCount := len(blk.GetData().GetData())
 
-	writes, blockInfo, err := parser.Parse(blk)
+	parsedData, blockInfo, err := parser.Parse(blk)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +65,7 @@ func processBlock(blk *common.Block) (*types.ProcessedBlock, error) {
 	return &types.ProcessedBlock{
 		Number:    number,
 		Txns:      txCount,
-		Data:      writes,
+		Data:      parsedData,
 		BlockInfo: blockInfo,
 	}, nil
 }

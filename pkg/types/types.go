@@ -65,3 +65,19 @@ type BlockInfo struct {
 	PreviousHash []byte
 	DataHash     []byte
 }
+
+// TxNamespaceRecord represents a namespace within a transaction.
+type TxNamespaceRecord struct {
+	BlockNum       uint64
+	TxNum          uint64
+	TxID           string
+	NsID           string
+	NsVersion      uint64
+	ValidationCode int32
+}
+
+// ParsedBlockData contains both writes and namespace records.
+type ParsedBlockData struct {
+	Writes       []WriteRecord
+	TxNamespaces []TxNamespaceRecord
+}

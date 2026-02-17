@@ -54,13 +54,11 @@ func (s *GRPCServer) GetBlock(ctx context.Context, req *pb.GetBlockRequest) (*pb
 	}
 	offsetWrites := req.OffsetWrites
 
-	// Get block
 	block, err := s.api.q.GetBlock(ctx, blockNum)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "block not found: %v", err)
 	}
 
-	// Get transactions
 	txs, err := s.api.q.GetTransactionsByBlock(ctx, dbsqlc.GetTransactionsByBlockParams{
 		BlockNum: blockNum,
 		Limit:    limitTx,
@@ -70,7 +68,6 @@ func (s *GRPCServer) GetBlock(ctx context.Context, req *pb.GetBlockRequest) (*pb
 		return nil, status.Errorf(codes.Internal, "failed to get transactions: %v", err)
 	}
 
-	// Build response
 	resp := &pb.BlockResponse{
 		BlockNum:     block.BlockNum,
 		TxCount:      block.TxCount,

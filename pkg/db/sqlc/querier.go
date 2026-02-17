@@ -12,10 +12,12 @@ type Querier interface {
 	GetBlock(ctx context.Context, blockNum int64) (Block, error)
 	GetBlockHeight(ctx context.Context) (interface{}, error)
 	GetTransactionByTxID(ctx context.Context, txID []byte) (Transaction, error)
+	GetTransactionID(ctx context.Context, arg GetTransactionIDParams) (int64, error)
 	GetTransactionsByBlock(ctx context.Context, arg GetTransactionsByBlockParams) ([]Transaction, error)
 	GetWritesByTx(ctx context.Context, arg GetWritesByTxParams) ([]Writeset, error)
 	InsertBlock(ctx context.Context, arg InsertBlockParams) error
-	InsertTransaction(ctx context.Context, arg InsertTransactionParams) error
+	InsertTransaction(ctx context.Context, arg InsertTransactionParams) (int64, error)
+	InsertTxNamespace(ctx context.Context, arg InsertTxNamespaceParams) error
 	InsertWrite(ctx context.Context, arg InsertWriteParams) error
 	UpsertNamespace(ctx context.Context, name []byte) (int64, error)
 }

@@ -9,6 +9,7 @@ package db
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 
 	"github.com/jackc/pgx/v5"
@@ -44,13 +45,14 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 		return errors.New("processed block is nil")
 	}
 
-	// Extract writes from pb.Data
-	writes, ok := pb.Data.([]types.WriteRecord)
+	// Extract parsed data from pb.Data
+	parsedData, ok := pb.Data.(*types.ParsedBlockData)
 	if !ok {
-		return errors.New("processed block Data is not []types.WriteRecord")
+		return errors.New("processed block Data is not *types.ParsedBlockData")
 	}
+	writes := parsedData.Writes
+	txNamespaces := parsedData.TxNamespaces
 
-	// Choose where to begin a transaction: prefer dedicated conn if present.
 	var (
 		tx  pgx.Tx
 		err error
@@ -66,7 +68,6 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 		return err
 	}
 
-	// Ensure rollback on error
 	committed := false
 	defer func() {
 		if !committed {
@@ -74,10 +75,8 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 		}
 	}()
 
-	// Use sqlc queries bound to the transaction
 	q := dbsqlc.New(tx)
 
-	// Insert block header
 	if err := q.InsertBlock(ctx, dbsqlc.InsertBlockParams{
 		BlockNum:     int64(pb.BlockInfo.Number),
 		TxCount:      int32(pb.Txns),
@@ -87,11 +86,28 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 		return err
 	}
 
-	// Cache namespace -> id to avoid repeated upserts within the same block
+	// Cache namespace IDs and transaction IDs to avoid repeated lookups
 	nsCache := make(map[string]int64)
+	txIDCache := make(map[string]int64)
+
+	// Insert all transactions first (some may not have writes)
+	for _, txNs := range txNamespaces {
+		txKey := fmt.Sprintf("%d-%d", txNs.BlockNum, txNs.TxNum)
+		if _, found := txIDCache[txKey]; !found {
+			txID, err := q.InsertTransaction(ctx, dbsqlc.InsertTransactionParams{
+				BlockNum:       int64(txNs.BlockNum),
+				TxNum:          int64(txNs.TxNum),
+				TxID:           []byte(txNs.TxID),
+				ValidationCode: int64(txNs.ValidationCode),
+			})
+			if err != nil {
+				return err
+			}
+			txIDCache[txKey] = txID
+		}
+	}
 
 	for _, w := range writes {
-		// Upsert namespace (BYTEA)
 		nsID, found := nsCache[w.Namespace]
 		if !found {
 			id, err := q.UpsertNamespace(ctx, []byte(w.Namespace))
@@ -102,17 +118,20 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 			nsCache[w.Namespace] = id
 		}
 
-		// Insert transaction (BYTEA)
-		if err := q.InsertTransaction(ctx, dbsqlc.InsertTransactionParams{
-			BlockNum:       int64(w.BlockNum),
-			TxNum:          int64(w.TxNum),
-			TxID:           []byte(w.TxID),
-			ValidationCode: int64(w.ValidationCode),
-		}); err != nil {
-			return err
+		txKey := fmt.Sprintf("%d-%d", w.BlockNum, w.TxNum)
+		if _, found := txIDCache[txKey]; !found {
+			txID, err := q.InsertTransaction(ctx, dbsqlc.InsertTransactionParams{
+				BlockNum:       int64(w.BlockNum),
+				TxNum:          int64(w.TxNum),
+				TxID:           []byte(w.TxID),
+				ValidationCode: int64(w.ValidationCode),
+			})
+			if err != nil {
+				return err
+			}
+			txIDCache[txKey] = txID
 		}
 
-		// Insert write (BYTEA)
 		if err := q.InsertWrite(ctx, dbsqlc.InsertWriteParams{
 			NamespaceID: nsID,
 			BlockNum:    int64(w.BlockNum),
@@ -125,13 +144,25 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 		}
 	}
 
-	// Commit transaction
+	// Insert transaction-namespace relationships
+	for _, txNs := range txNamespaces {
+		txKey := fmt.Sprintf("%d-%d", txNs.BlockNum, txNs.TxNum)
+		txID := txIDCache[txKey]
+
+		if err := q.InsertTxNamespace(ctx, dbsqlc.InsertTxNamespaceParams{
+			TransactionID: txID,
+			NsID:          txNs.NsID,
+			NsVersion:     int64(txNs.NsVersion),
+		}); err != nil {
+			return err
+		}
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
 	committed = true
 
-	// Log using the block number from BlockInfo for consistency
 	log.Printf("db: stored block %d with %d writes", pb.BlockInfo.Number, len(writes))
 	return nil
 }

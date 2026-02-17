@@ -44,12 +44,6 @@ func writeError(w http.ResponseWriter, msg string, code int) {
 	http.Error(w, msg, code)
 }
 
-//
-// ------------------------------------------------------------
-// GET /blocks/height
-// ------------------------------------------------------------
-//
-
 func (a *API) GetBlockHeight(w http.ResponseWriter, r *http.Request) {
 	height, err := a.q.GetBlockHeight(r.Context())
 	if err != nil {
@@ -57,20 +51,12 @@ func (a *API) GetBlockHeight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// sqlc returns any because of COALESCE
 	h := height.(int64)
 
 	writeJSON(w, map[string]int64{"height": h})
 }
 
-//
-// ------------------------------------------------------------
-// GET /blocks/{block_num}
-// ------------------------------------------------------------
-//
-
 func (a *API) GetBlockByNumber(w http.ResponseWriter, r *http.Request) {
-	// Note: r.PathValue is assumed to be provided by your router; keep as-is.
 	blockNumStr := r.PathValue("block_num")
 	blockNum, _ := strconv.ParseInt(blockNumStr, 10, 64)
 
@@ -136,14 +122,7 @@ func (a *API) GetBlockByNumber(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, resp)
 }
 
-//
-// ------------------------------------------------------------
-// GET /tx/{tx_id_hex}
-// ------------------------------------------------------------
-//
-
 func (a *API) GetTxByID(w http.ResponseWriter, r *http.Request) {
-	// Note: r.PathValue is assumed to be provided by your router; keep as-is.
 	txHex := r.PathValue("tx_id_hex")
 	txBytes, err := hex.DecodeString(txHex)
 	if err != nil {
@@ -197,11 +176,6 @@ func (a *API) GetTxByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, resp)
 }
 
-//
-// ------------------------------------------------------------
-// Helpers
-// ------------------------------------------------------------
-//
 
 func parseInt(r *http.Request, key string, def int) int {
 	v := r.URL.Query().Get(key)
@@ -221,7 +195,6 @@ func (a *API) GetBlockHeightValue(ctx context.Context) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	// sqlc returns interface{} because of COALESCE; assert to int64
 	height := h.(int64)
 	return height, nil
 }
@@ -236,12 +209,9 @@ type HealthResponse struct {
 // - Liveness: returns 200 if the process is running.
 // - Readiness: attempts a short DB ping; if DB is unreachable returns 503.
 func (a *API) HealthHandler(w http.ResponseWriter, r *http.Request) {
-	// Liveness: process is alive if this handler runs.
-	// Readiness: check DB connectivity with a short timeout.
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	// If API has a pool handle, try pinging it. If not, treat as ready.
 	if a.pool != nil {
 		if err := a.pool.Ping(ctx); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
@@ -253,6 +223,5 @@ func (a *API) HealthHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Ready
 	writeJSON(w, HealthResponse{Status: "ok"})
 }

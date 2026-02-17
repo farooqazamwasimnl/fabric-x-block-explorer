@@ -21,7 +21,6 @@ import (
 // forwards received Fabric blocks to the 'out' channel and handles reconnection
 // with backoff. Fatal errors and panics are reported on errCh.
 func BlockReceiver(ctx context.Context, streamer *sidecarstream.Streamer, out chan<- *common.Block, errCh chan<- error, channelSize int) {
-	// Recover from panics and report them to errCh.
 	defer func() {
 		if r := recover(); r != nil {
 			errCh <- fmt.Errorf("blockReceiver panic: %v", r)
@@ -32,7 +31,6 @@ func BlockReceiver(ctx context.Context, streamer *sidecarstream.Streamer, out ch
 	backoffObj := NewBackoff()
 
 	for {
-		// Stop immediately if context is cancelled.
 		select {
 		case <-ctx.Done():
 			log.Println("blockreceiver stopping")
@@ -40,19 +38,16 @@ func BlockReceiver(ctx context.Context, streamer *sidecarstream.Streamer, out ch
 		default:
 		}
 
-		// Per-connection channel for Sidecar deliver.
 		blockCh := make(chan *common.Block, channelSize)
 
 		log.Println("blockreceiver: starting Sidecar stream")
 		streamer.StartDeliver(ctx, blockCh)
 		backoffObj.Reset()
 
-		// Consume blocks from blockCh and forward to out.
 		if err := consumeBlocks(ctx, blockCh, out); err != nil {
 			log.Printf("blockreceiver stream error: %v", err)
 		}
 
-		// Reconnect with backoff delay.
 		wait := backoffObj.NextBackOff()
 		if wait == backoff.Stop {
 			wait = 30 * time.Second
@@ -64,7 +59,6 @@ func BlockReceiver(ctx context.Context, streamer *sidecarstream.Streamer, out ch
 			log.Println("blockreceiver stopping before reconnect")
 			return
 		case <-time.After(wait):
-			// loop and try again
 		}
 	}
 }
@@ -81,16 +75,13 @@ func consumeBlocks(ctx context.Context, blockCh <-chan *common.Block, out chan<-
 				return fmt.Errorf("sidecar block channel closed")
 			}
 			if blk == nil {
-				// skip nil blocks
 				continue
 			}
 
-			// Respect context cancellation while attempting to forward.
 			select {
 			case <-ctx.Done():
 				return nil
 			case out <- blk:
-				// forwarded successfully
 			}
 		}
 	}

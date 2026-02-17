@@ -24,6 +24,13 @@ type Transaction struct {
 	ValidationCode int64  `json:"validation_code"`
 }
 
+type TxNamespace struct {
+	ID            int64  `json:"id"`
+	TransactionID int64  `json:"transaction_id"`
+	NsID          string `json:"ns_id"`
+	NsVersion     int64  `json:"ns_version"`
+}
+
 type Writeset struct {
 	ID          int64  `json:"id"`
 	NamespaceID int64  `json:"namespace_id"`

@@ -14,6 +14,14 @@ CREATE TABLE IF NOT EXISTS transactions (
     UNIQUE (block_num, tx_num)
 );
 
+CREATE TABLE IF NOT EXISTS tx_namespaces (
+    id BIGSERIAL PRIMARY KEY,
+    transaction_id BIGINT NOT NULL REFERENCES transactions(id),
+    ns_id TEXT NOT NULL,
+    ns_version BIGINT NOT NULL,
+    UNIQUE (transaction_id, ns_id)
+);
+
 CREATE TABLE IF NOT EXISTS namespaces (
     id BIGSERIAL PRIMARY KEY,
     name BYTEA NOT NULL UNIQUE   

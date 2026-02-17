@@ -15,16 +15,14 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Parse converts a Fabric block into a slice of WriteRecord and BlockInfo.
-func Parse(b *common.Block) ([]types.WriteRecord, *types.BlockInfo, error) {
+// Parse converts a Fabric block into ParsedBlockData and BlockInfo.
+func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 	writes := []types.WriteRecord{}
+	txNamespaces := []types.TxNamespaceRecord{}
 
-	// -------------------------------
-	// Block Header
-	// -------------------------------
 	header := b.GetHeader()
 	if header == nil {
-		return writes, nil, fmt.Errorf("block header missing")
+		return &types.ParsedBlockData{Writes: writes, TxNamespaces: txNamespaces}, nil, fmt.Errorf("block header missing")
 	}
 
 	blockInfo := &types.BlockInfo{
@@ -33,25 +31,17 @@ func Parse(b *common.Block) ([]types.WriteRecord, *types.BlockInfo, error) {
 		DataHash:     header.DataHash,
 	}
 
-	// -------------------------------
-	// Transaction Filter
-	// -------------------------------
 	if b.Metadata == nil || len(b.Metadata.Metadata) <= int(common.BlockMetadataIndex_TRANSACTIONS_FILTER) {
-		return writes, blockInfo, fmt.Errorf("block metadata missing TRANSACTIONS_FILTER")
+		return &types.ParsedBlockData{Writes: writes, TxNamespaces: txNamespaces}, blockInfo, fmt.Errorf("block metadata missing TRANSACTIONS_FILTER")
 	}
 	txFilter := b.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER]
 
-	// -------------------------------
-	// Parse Each Transaction
-	// -------------------------------
 	for txNum, envBytes := range b.Data.Data {
-		// Skip if txNum is out of range for the filter
 		if txNum >= len(txFilter) {
 			continue
 		}
 
 		validationCode := protoblocktx.Status(txFilter[txNum])
-		// Only process committed transactions
 		if validationCode != protoblocktx.Status_COMMITTED {
 			continue
 		}
@@ -72,6 +62,16 @@ func Parse(b *common.Block) ([]types.WriteRecord, *types.BlockInfo, error) {
 
 		// Convert RW sets to WriteRecord and attach validation code
 		for _, rw := range rwsets {
+			txNsRecord := types.TxNamespaceRecord{
+				BlockNum:       header.Number,
+				TxNum:          uint64(txNum),
+				TxID:           rw.TxID,
+				NsID:           rw.Namespace,
+				NsVersion:      rw.NsVersion,
+				ValidationCode: int32(validationCode),
+			}
+			txNamespaces = append(txNamespaces, txNsRecord)
+
 			records := types.Records(
 				rw.Namespace,
 				header.Number,
@@ -88,7 +88,10 @@ func Parse(b *common.Block) ([]types.WriteRecord, *types.BlockInfo, error) {
 		}
 	}
 
-	return writes, blockInfo, nil
+	return &types.ParsedBlockData{
+		Writes:       writes,
+		TxNamespaces: txNamespaces,
+	}, blockInfo, nil
 }
 
 // rwSets extracts namespace read-write sets and txID from an envelope.
@@ -96,33 +99,28 @@ func Parse(b *common.Block) ([]types.WriteRecord, *types.BlockInfo, error) {
 func rwSets(env *common.Envelope) ([]nsRwset, error) {
 	out := []nsRwset{}
 
-	// Payload
 	pl := &common.Payload{}
 	if err := proto.Unmarshal(env.Payload, pl); err != nil {
 		return out, fmt.Errorf("payload: %w", err)
 	}
 
-	// Channel header -> TxID
 	chdr := &common.ChannelHeader{}
 	if err := proto.Unmarshal(pl.Header.ChannelHeader, chdr); err != nil {
 		return out, fmt.Errorf("channel header: %w", err)
 	}
 	txID := chdr.TxId
 
-	// Transaction (custom protoblocktx)
 	tx := &protoblocktx.Tx{}
 	if err := proto.Unmarshal(pl.Data, tx); err != nil {
 		return out, fmt.Errorf("transaction: %w", err)
 	}
 
-	// Namespaces -> build ReadWriteSet per namespace
 	for _, ns := range tx.Namespaces {
 		rws := types.ReadWriteSet{
 			Reads:  []types.KVRead{},
 			Writes: []types.KVWrite{},
 		}
 
-		// Blind writes
 		for _, bw := range ns.BlindWrites {
 			rws.Writes = append(rws.Writes, types.KVWrite{
 				Key:   string(bw.Key),
@@ -130,7 +128,6 @@ func rwSets(env *common.Envelope) ([]nsRwset, error) {
 			})
 		}
 
-		// Normal reads + writes
 		for _, rw := range ns.ReadWrites {
 			read := types.KVRead{Key: string(rw.Key)}
 			if rw.Version != nil && *rw.Version > 0 {
@@ -149,8 +146,7 @@ func rwSets(env *common.Envelope) ([]nsRwset, error) {
 		out = append(out, nsRwset{
 			Namespace: ns.NsId,
 			Rwset:     rws,
-			TxID:      txID,
-		})
+			TxID:      txID,			NsVersion: ns.NsVersion,		})
 	}
 
 	return out, nil
@@ -160,4 +156,5 @@ type nsRwset struct {
 	Namespace string             `json:"namespace"`
 	Rwset     types.ReadWriteSet `json:"rwset"`
 	TxID      string             `json:"-"`
+	NsVersion uint64             `json:"-"`
 }

@@ -28,6 +28,24 @@ func (q *Queries) GetTransactionByTxID(ctx context.Context, txID []byte) (Transa
 	return i, err
 }
 
+const getTransactionID = `-- name: GetTransactionID :one
+SELECT id
+FROM transactions
+WHERE block_num = $1 AND tx_num = $2
+`
+
+type GetTransactionIDParams struct {
+	BlockNum int64 `json:"block_num"`
+	TxNum    int64 `json:"tx_num"`
+}
+
+func (q *Queries) GetTransactionID(ctx context.Context, arg GetTransactionIDParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getTransactionID, arg.BlockNum, arg.TxNum)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getTransactionsByBlock = `-- name: GetTransactionsByBlock :many
 SELECT id, block_num, tx_num, tx_id, validation_code
 FROM transactions
@@ -68,10 +86,11 @@ func (q *Queries) GetTransactionsByBlock(ctx context.Context, arg GetTransaction
 	return items, nil
 }
 
-const insertTransaction = `-- name: InsertTransaction :exec
+const insertTransaction = `-- name: InsertTransaction :one
 INSERT INTO transactions (block_num, tx_num, tx_id, validation_code)
 VALUES ($1, $2, $3, $4)
-ON CONFLICT (block_num, tx_num) DO NOTHING
+ON CONFLICT (block_num, tx_num) DO UPDATE SET tx_id = EXCLUDED.tx_id
+RETURNING id
 `
 
 type InsertTransactionParams struct {
@@ -81,12 +100,31 @@ type InsertTransactionParams struct {
 	ValidationCode int64  `json:"validation_code"`
 }
 
-func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionParams) error {
-	_, err := q.db.Exec(ctx, insertTransaction,
+func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionParams) (int64, error) {
+	row := q.db.QueryRow(ctx, insertTransaction,
 		arg.BlockNum,
 		arg.TxNum,
 		arg.TxID,
 		arg.ValidationCode,
 	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const insertTxNamespace = `-- name: InsertTxNamespace :exec
+INSERT INTO tx_namespaces (transaction_id, ns_id, ns_version)
+VALUES ($1, $2, $3)
+ON CONFLICT (transaction_id, ns_id) DO NOTHING
+`
+
+type InsertTxNamespaceParams struct {
+	TransactionID int64  `json:"transaction_id"`
+	NsID          string `json:"ns_id"`
+	NsVersion     int64  `json:"ns_version"`
+}
+
+func (q *Queries) InsertTxNamespace(ctx context.Context, arg InsertTxNamespaceParams) error {
+	_, err := q.db.Exec(ctx, insertTxNamespace, arg.TransactionID, arg.NsID, arg.NsVersion)
 	return err
 }
