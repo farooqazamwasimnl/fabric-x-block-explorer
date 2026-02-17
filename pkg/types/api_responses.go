@@ -20,21 +20,28 @@ type BlockResponse struct {
 
 type TransactionWithWriteSets struct {
 	ID             int64                 `json:"id"`
-	BlockNum       int64                 `json:"block_num"`
 	TxNum          int64                 `json:"tx_num"`
 	TxID           string                `json:"tx_id"`
 	ValidationCode int64                 `json:"validation_code"`
+	Reads          []ReadRecordResponse  `json:"reads"`
 	Writes         []WriteRecordResponse `json:"writes"`
 }
 
-type WriteRecordResponse struct {
+type ReadRecordResponse struct {
 	ID          int64  `json:"id"`
-	NamespaceID int64  `json:"namespace_id"`
-	BlockNum    int64  `json:"block_num"`
-	TxNum       int64  `json:"tx_num"`
-	TxID        string `json:"tx_id"`
+	NsID        string `json:"ns_id"`
 	Key         string `json:"key"`
-	Value       string `json:"value"`
+	Version     *int64 `json:"version,omitempty"`
+	IsReadWrite bool   `json:"is_read_write"`
+}
+
+type WriteRecordResponse struct {
+	ID           int64  `json:"id"`
+	NsID         string `json:"ns_id"`
+	Key          string `json:"key"`
+	Value        string `json:"value"`
+	IsBlindWrite bool   `json:"is_blind_write"`
+	ReadVersion  *int64 `json:"read_version,omitempty"`
 }
 
 type TxWithBlockResponse struct {

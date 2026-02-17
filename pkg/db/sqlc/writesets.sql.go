@@ -9,54 +9,6 @@ import (
 	"context"
 )
 
-const getWritesByTx = `-- name: GetWritesByTx :many
-SELECT id, namespace_id, block_num, tx_num, tx_id, key, value
-FROM writesets
-WHERE block_num = $1 AND tx_num = $2
-ORDER BY id
-LIMIT $3 OFFSET $4
-`
-
-type GetWritesByTxParams struct {
-	BlockNum int64 `json:"block_num"`
-	TxNum    int64 `json:"tx_num"`
-	Limit    int32 `json:"limit"`
-	Offset   int32 `json:"offset"`
-}
-
-func (q *Queries) GetWritesByTx(ctx context.Context, arg GetWritesByTxParams) ([]Writeset, error) {
-	rows, err := q.db.Query(ctx, getWritesByTx,
-		arg.BlockNum,
-		arg.TxNum,
-		arg.Limit,
-		arg.Offset,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Writeset{}
-	for rows.Next() {
-		var i Writeset
-		if err := rows.Scan(
-			&i.ID,
-			&i.NamespaceID,
-			&i.BlockNum,
-			&i.TxNum,
-			&i.TxID,
-			&i.Key,
-			&i.Value,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const insertWrite = `-- name: InsertWrite :exec
 INSERT INTO writesets
 (namespace_id, block_num, tx_num, tx_id, key, value)

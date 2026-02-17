@@ -77,6 +77,11 @@ func (s *GRPCServer) GetBlock(ctx context.Context, req *pb.GetBlockRequest) (*pb
 	}
 
 	for _, tx := range txs {
+		reads, _ := s.api.q.GetReadsByTx(ctx, dbsqlc.GetReadsByTxParams{
+			BlockNum: tx.BlockNum,
+			TxNum:    tx.TxNum,
+		})
+
 		writes, _ := s.api.q.GetWritesByTx(ctx, dbsqlc.GetWritesByTxParams{
 			BlockNum: tx.BlockNum,
 			TxNum:    tx.TxNum,
@@ -86,22 +91,39 @@ func (s *GRPCServer) GetBlock(ctx context.Context, req *pb.GetBlockRequest) (*pb
 
 		txResp := &pb.TransactionWithWrites{
 			Id:             tx.ID,
-			BlockNum:       tx.BlockNum,
 			TxNum:          tx.TxNum,
 			TxId:           hex.EncodeToString(tx.TxID),
 			ValidationCode: tx.ValidationCode,
+			Reads:          make([]*pb.ReadRecord, 0, len(reads)),
 			Writes:         make([]*pb.WriteRecord, 0, len(writes)),
 		}
 
+		for _, r := range reads {
+			var version *int64
+			if r.Version.Valid {
+				version = &r.Version.Int64
+			}
+			txResp.Reads = append(txResp.Reads, &pb.ReadRecord{
+				Id:          r.ID,
+				NsId:        r.NsID,
+				Key:         hex.EncodeToString(r.Key),
+				Version:     version,
+				IsReadWrite: r.IsReadWrite,
+			})
+		}
+
 		for _, w := range writes {
+			var readVersion *int64
+			if w.ReadVersion.Valid {
+				readVersion = &w.ReadVersion.Int64
+			}
 			txResp.Writes = append(txResp.Writes, &pb.WriteRecord{
-				Id:          w.ID,
-				NamespaceId: w.NamespaceID,
-				BlockNum:    w.BlockNum,
-				TxNum:       w.TxNum,
-				TxId:        hex.EncodeToString(w.TxID),
-				Key:         hex.EncodeToString(w.Key),
-				Value:       hex.EncodeToString(w.Value),
+				Id:           w.ID,
+				NsId:         w.NsID,
+				Key:          hex.EncodeToString(w.Key),
+				Value:        hex.EncodeToString(w.Value),
+				IsBlindWrite: w.IsBlindWrite,
+				ReadVersion:  readVersion,
 			})
 		}
 
@@ -128,6 +150,11 @@ func (s *GRPCServer) GetTransaction(ctx context.Context, req *pb.GetTransactionR
 		return nil, status.Errorf(codes.Internal, "failed to get block: %v", err)
 	}
 
+	reads, _ := s.api.q.GetReadsByTx(ctx, dbsqlc.GetReadsByTxParams{
+		BlockNum: tx.BlockNum,
+		TxNum:    tx.TxNum,
+	})
+
 	writes, _ := s.api.q.GetWritesByTx(ctx, dbsqlc.GetWritesByTxParams{
 		BlockNum: tx.BlockNum,
 		TxNum:    tx.TxNum,
@@ -137,22 +164,39 @@ func (s *GRPCServer) GetTransaction(ctx context.Context, req *pb.GetTransactionR
 
 	txResp := &pb.TransactionWithWrites{
 		Id:             tx.ID,
-		BlockNum:       tx.BlockNum,
 		TxNum:          tx.TxNum,
 		TxId:           hex.EncodeToString(tx.TxID),
 		ValidationCode: tx.ValidationCode,
+		Reads:          make([]*pb.ReadRecord, 0, len(reads)),
 		Writes:         make([]*pb.WriteRecord, 0, len(writes)),
 	}
 
+	for _, r := range reads {
+		var version *int64
+		if r.Version.Valid {
+			version = &r.Version.Int64
+		}
+		txResp.Reads = append(txResp.Reads, &pb.ReadRecord{
+			Id:          r.ID,
+			NsId:        r.NsID,
+			Key:         hex.EncodeToString(r.Key),
+			Version:     version,
+			IsReadWrite: r.IsReadWrite,
+		})
+	}
+
 	for _, w := range writes {
+		var readVersion *int64
+		if w.ReadVersion.Valid {
+			readVersion = &w.ReadVersion.Int64
+		}
 		txResp.Writes = append(txResp.Writes, &pb.WriteRecord{
-			Id:          w.ID,
-			NamespaceId: w.NamespaceID,
-			BlockNum:    w.BlockNum,
-			TxNum:       w.TxNum,
-			TxId:        hex.EncodeToString(w.TxID),
-			Key:         hex.EncodeToString(w.Key),
-			Value:       hex.EncodeToString(w.Value),
+			Id:           w.ID,
+			NsId:         w.NsID,
+			Key:          hex.EncodeToString(w.Key),
+			Value:        hex.EncodeToString(w.Value),
+			IsBlindWrite: w.IsBlindWrite,
+			ReadVersion:  readVersion,
 		})
 	}
 

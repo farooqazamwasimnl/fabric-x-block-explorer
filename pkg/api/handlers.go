@@ -89,6 +89,11 @@ func (a *API) GetBlockByNumber(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, tx := range txs {
+		reads, _ := a.q.GetReadsByTx(r.Context(), dbsqlc.GetReadsByTxParams{
+			BlockNum: tx.BlockNum,
+			TxNum:    tx.TxNum,
+		})
+
 		writes, _ := a.q.GetWritesByTx(r.Context(), dbsqlc.GetWritesByTxParams{
 			BlockNum: tx.BlockNum,
 			TxNum:    tx.TxNum,
@@ -98,21 +103,37 @@ func (a *API) GetBlockByNumber(w http.ResponseWriter, r *http.Request) {
 
 		txResp := types.TransactionWithWriteSets{
 			ID:             tx.ID,
-			BlockNum:       tx.BlockNum,
 			TxNum:          tx.TxNum,
 			TxID:           hex.EncodeToString(tx.TxID),
 			ValidationCode: tx.ValidationCode,
 		}
 
+		for _, rrec := range reads {
+			var version *int64
+			if rrec.Version.Valid {
+				version = &rrec.Version.Int64
+			}
+			txResp.Reads = append(txResp.Reads, types.ReadRecordResponse{
+				ID:          rrec.ID,
+				NsID:        rrec.NsID,
+				Key:         hex.EncodeToString(rrec.Key),
+				Version:     version,
+				IsReadWrite: rrec.IsReadWrite,
+			})
+		}
+
 		for _, wrec := range writes {
+			var readVersion *int64
+			if wrec.ReadVersion.Valid {
+				readVersion = &wrec.ReadVersion.Int64
+			}
 			txResp.Writes = append(txResp.Writes, types.WriteRecordResponse{
-				ID:          wrec.ID,
-				NamespaceID: wrec.NamespaceID,
-				BlockNum:    wrec.BlockNum,
-				TxNum:       wrec.TxNum,
-				TxID:        hex.EncodeToString(wrec.TxID),
-				Key:         hex.EncodeToString(wrec.Key),
-				Value:       hex.EncodeToString(wrec.Value),
+				ID:           wrec.ID,
+				NsID:         wrec.NsID,
+				Key:          hex.EncodeToString(wrec.Key),
+				Value:        hex.EncodeToString(wrec.Value),
+				IsBlindWrite: wrec.IsBlindWrite,
+				ReadVersion:  readVersion,
 			})
 		}
 
@@ -138,6 +159,11 @@ func (a *API) GetTxByID(w http.ResponseWriter, r *http.Request) {
 
 	block, _ := a.q.GetBlock(r.Context(), tx.BlockNum)
 
+	reads, _ := a.q.GetReadsByTx(r.Context(), dbsqlc.GetReadsByTxParams{
+		BlockNum: tx.BlockNum,
+		TxNum:    tx.TxNum,
+	})
+
 	writes, _ := a.q.GetWritesByTx(r.Context(), dbsqlc.GetWritesByTxParams{
 		BlockNum: tx.BlockNum,
 		TxNum:    tx.TxNum,
@@ -148,7 +174,6 @@ func (a *API) GetTxByID(w http.ResponseWriter, r *http.Request) {
 	resp := types.TxWithBlockResponse{
 		Transaction: types.TransactionWithWriteSets{
 			ID:             tx.ID,
-			BlockNum:       tx.BlockNum,
 			TxNum:          tx.TxNum,
 			TxID:           hex.EncodeToString(tx.TxID),
 			ValidationCode: tx.ValidationCode,
@@ -161,15 +186,32 @@ func (a *API) GetTxByID(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	for _, rrec := range reads {
+		var version *int64
+		if rrec.Version.Valid {
+			version = &rrec.Version.Int64
+		}
+		resp.Transaction.Reads = append(resp.Transaction.Reads, types.ReadRecordResponse{
+			ID:          rrec.ID,
+			NsID:        rrec.NsID,
+			Key:         hex.EncodeToString(rrec.Key),
+			Version:     version,
+			IsReadWrite: rrec.IsReadWrite,
+		})
+	}
+
 	for _, wrec := range writes {
+		var readVersion *int64
+		if wrec.ReadVersion.Valid {
+			readVersion = &wrec.ReadVersion.Int64
+		}
 		resp.Transaction.Writes = append(resp.Transaction.Writes, types.WriteRecordResponse{
-			ID:          wrec.ID,
-			NamespaceID: wrec.NamespaceID,
-			BlockNum:    wrec.BlockNum,
-			TxNum:       wrec.TxNum,
-			TxID:        hex.EncodeToString(wrec.TxID),
-			Key:         hex.EncodeToString(wrec.Key),
-			Value:       hex.EncodeToString(wrec.Value),
+			ID:           wrec.ID,
+			NsID:         wrec.NsID,
+			Key:          hex.EncodeToString(wrec.Key),
+			Value:        hex.EncodeToString(wrec.Value),
+			IsBlindWrite: wrec.IsBlindWrite,
+			ReadVersion:  readVersion,
 		})
 	}
 

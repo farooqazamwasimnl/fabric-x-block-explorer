@@ -45,25 +45,33 @@ message BlockResponse {
   repeated TransactionWithWrites transactions = 5;
 }
 
-// TransactionWithWrites contains transaction and its write sets
+// TransactionWithWrites contains transaction and its read/write sets
 message TransactionWithWrites {
   int64 id = 1;
-  int64 block_num = 2;
-  int64 tx_num = 3;
-  string tx_id = 4;
-  int64 validation_code = 5;
+  int64 tx_num = 2;
+  string tx_id = 3;
+  int64 validation_code = 4;
+  repeated ReadRecord reads = 5;
   repeated WriteRecord writes = 6;
+}
+
+// ReadRecord contains a single read record
+message ReadRecord {
+  int64 id = 1;
+  string ns_id = 2;
+  string key = 3;
+  optional int64 version = 4;
+  bool is_read_write = 5;
 }
 
 // WriteRecord contains a single write record
 message WriteRecord {
   int64 id = 1;
-  int64 namespace_id = 2;
-  int64 block_num = 3;
-  int64 tx_num = 4;
-  string tx_id = 5;
-  string key = 6;
-  string value = 7;
+  string ns_id = 2;
+  string key = 3;
+  string value = 4;
+  bool is_blind_write = 5;
+  optional int64 read_version = 6;
 }
 
 // GetTransactionRequest to fetch transaction by ID
