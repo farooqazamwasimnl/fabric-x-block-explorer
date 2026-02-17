@@ -1,0 +1,493 @@
+/*
+Copyright IBM Corp. All Rights Reserved.
+
+SPDX-License-Identifier: Apache-2.0
+*/
+
+package parser
+
+import (
+	"testing"
+
+	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/constants"
+	"github.com/hyperledger/fabric-protos-go-apiv2/common"
+	"github.com/hyperledger/fabric-protos-go-apiv2/msp"
+	"github.com/hyperledger/fabric-protos-go-apiv2/peer"
+	"github.com/hyperledger/fabric-x-committer/api/protoblocktx"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
+)
+
+// TestParse tests the main Parse function with various block scenarios
+func TestParse(t *testing.T) {
+	tests := []struct {
+		name              string
+		block             *common.Block
+		expectError       bool
+		expectedBlockNum  uint64
+		expectedTxCount   int
+		expectedWritesCnt int
+		expectedReadsCnt  int
+	}{
+		{
+			name:        "nil block header",
+			block:       &common.Block{},
+			expectError: true,
+		},
+		{
+			name: "missing metadata",
+			block: &common.Block{
+				Header: &common.BlockHeader{
+					Number: 1,
+				},
+			},
+			expectError: true,
+		},
+		{
+			name: "empty block with valid structure",
+			block: &common.Block{
+				Header: &common.BlockHeader{
+					Number:       5,
+					PreviousHash: []byte("prevhash"),
+					DataHash:     []byte("datahash"),
+				},
+				Data: &common.BlockData{
+					Data: [][]byte{},
+				},
+				Metadata: &common.BlockMetadata{
+					Metadata: [][]byte{
+						{}, // SIGNATURES
+						{}, // LAST_CONFIG
+						{}, // TRANSACTIONS_FILTER
+					},
+				},
+			},
+			expectError:      false,
+			expectedBlockNum: 5,
+			expectedTxCount:  0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parsedData, blockInfo, err := Parse(tt.block)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.NotNil(t, parsedData)
+			assert.NotNil(t, blockInfo)
+			assert.Equal(t, tt.expectedBlockNum, blockInfo.Number)
+
+			if tt.expectedWritesCnt > 0 {
+				assert.Len(t, parsedData.Writes, tt.expectedWritesCnt)
+			}
+			if tt.expectedReadsCnt > 0 {
+				assert.Len(t, parsedData.Reads, tt.expectedReadsCnt)
+			}
+		})
+	}
+}
+
+// TestParseBlockWithTransaction tests parsing a block with a valid transaction
+func TestParseBlockWithTransaction(t *testing.T) {
+	// Create a simple transaction with one namespace
+	ns := &protoblocktx.TxNamespace{
+		NsId:      "mycc",
+		NsVersion: 1,
+		ReadWrites: []*protoblocktx.ReadWrite{
+			{
+				Key:     []byte("key1"),
+				Value:   []byte("value1"),
+				Version: uint64Ptr(10),
+			},
+		},
+		ReadsOnly: []*protoblocktx.Read{
+			{
+				Key:     []byte("key2"),
+				Version: uint64Ptr(5),
+			},
+		},
+	}
+
+	tx := &protoblocktx.Tx{
+		Namespaces: []*protoblocktx.TxNamespace{ns},
+	}
+	txBytes, err := proto.Marshal(tx)
+	require.NoError(t, err)
+
+	// Create channel header
+	chdr := &common.ChannelHeader{
+		Type:  int32(common.HeaderType_ENDORSER_TRANSACTION),
+		TxId:  "tx123",
+		Epoch: 0,
+	}
+	chdrBytes, err := proto.Marshal(chdr)
+	require.NoError(t, err)
+
+	// Create payload
+	payload := &common.Payload{
+		Header: &common.Header{
+			ChannelHeader: chdrBytes,
+		},
+		Data: txBytes,
+	}
+	payloadBytes, err := proto.Marshal(payload)
+	require.NoError(t, err)
+
+	// Create envelope
+	env := &common.Envelope{
+		Payload: payloadBytes,
+	}
+	envBytes, err := proto.Marshal(env)
+	require.NoError(t, err)
+
+	// Create block with the transaction
+	block := &common.Block{
+		Header: &common.BlockHeader{
+			Number:       10,
+			PreviousHash: []byte("prev"),
+			DataHash:     []byte("data"),
+		},
+		Data: &common.BlockData{
+			Data: [][]byte{envBytes},
+		},
+		Metadata: &common.BlockMetadata{
+			Metadata: [][]byte{
+				{}, // SIGNATURES
+				{}, // LAST_CONFIG
+				{byte(protoblocktx.Status_COMMITTED)}, // TRANSACTIONS_FILTER
+			},
+		},
+	}
+
+	parsedData, blockInfo, err := Parse(block)
+	require.NoError(t, err)
+	assert.NotNil(t, blockInfo)
+	assert.Equal(t, uint64(10), blockInfo.Number)
+
+	// Verify parsed data
+	assert.Len(t, parsedData.TxNamespaces, 1)
+	assert.Equal(t, "mycc", parsedData.TxNamespaces[0].NsID)
+	assert.Equal(t, "tx123", parsedData.TxNamespaces[0].TxID)
+
+	// Verify reads: 1 from ReadsOnly + 1 from ReadWrites
+	assert.Len(t, parsedData.Reads, 2)
+
+	// Verify writes: 1 from ReadWrites
+	assert.Len(t, parsedData.Writes, 1)
+	assert.Equal(t, "key1", parsedData.Writes[0].Key)
+	assert.Equal(t, []byte("value1"), parsedData.Writes[0].Value)
+}
+
+// TestExtractPolicies tests policy extraction from config transactions
+func TestExtractPolicies(t *testing.T) {
+	tests := []struct {
+		name           string
+		envelope       *common.Envelope
+		expectPolicies bool
+		expectedCount  int
+	}{
+		{
+			name: "non-config transaction",
+			envelope: createEnvelope(t, &common.ChannelHeader{
+				Type: int32(common.HeaderType_ENDORSER_TRANSACTION),
+			}, []byte("data")),
+			expectPolicies: false,
+		},
+		{
+			name: "config transaction with namespace policies",
+			envelope: createEnvelope(t, &common.ChannelHeader{
+				Type: int32(common.HeaderType_CONFIG),
+			}, marshalNamespacePolicies(t, &protoblocktx.NamespacePolicies{
+				Policies: []*protoblocktx.PolicyItem{
+					{
+						Namespace: "mycc",
+						Version:   1,
+						Policy:    []byte("policy_bytes"),
+					},
+				},
+			})),
+			expectPolicies: true,
+			expectedCount:  1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			policies, ok := extractPolicies(tt.envelope)
+
+			if !tt.expectPolicies {
+				assert.False(t, ok)
+				return
+			}
+
+			assert.True(t, ok)
+			assert.Len(t, policies, tt.expectedCount)
+		})
+	}
+}
+
+// TestPolicyToJSON tests policy conversion to JSON format
+func TestPolicyToJSON(t *testing.T) {
+	policyBytes := []byte("test_policy_data")
+	jsonData, err := policyToJSON(policyBytes)
+
+	require.NoError(t, err)
+	assert.NotNil(t, jsonData)
+	assert.Contains(t, string(jsonData), "policy_bytes")
+}
+
+// TestEndorsementToIdentityJSON tests extraction of identity from endorsement
+func TestEndorsementToIdentityJSON(t *testing.T) {
+	// Create a valid SerializedIdentity
+	serializedID := &msp.SerializedIdentity{
+		Mspid:   "Org1MSP",
+		IdBytes: []byte("certificate_data"),
+	}
+	serializedIDBytes, err := proto.Marshal(serializedID)
+	require.NoError(t, err)
+
+	// Create an Endorsement
+	endorsement := &peer.Endorsement{
+		Endorser:  serializedIDBytes,
+		Signature: []byte("signature"),
+	}
+	endorsementBytes, err := proto.Marshal(endorsement)
+	require.NoError(t, err)
+
+	// Test extraction
+	mspID, identityJSON, err := endorsementToIdentityJSON(endorsementBytes)
+
+	require.NoError(t, err)
+	assert.NotNil(t, mspID)
+	assert.Equal(t, "Org1MSP", *mspID)
+	assert.NotNil(t, identityJSON)
+	assert.Contains(t, string(identityJSON), "Org1MSP")
+	assert.Contains(t, string(identityJSON), "id_bytes")
+}
+
+// TestEndorsementToIdentityJSONInvalidData tests error handling
+func TestEndorsementToIdentityJSONInvalidData(t *testing.T) {
+	invalidBytes := []byte("invalid_protobuf")
+	_, _, err := endorsementToIdentityJSON(invalidBytes)
+	assert.Error(t, err)
+}
+
+// TestRWSets tests extraction of read-write sets from envelope
+func TestRWSets(t *testing.T) {
+	// Create namespace with read-write data
+	ns := &protoblocktx.TxNamespace{
+		NsId:      "chaincode1",
+		NsVersion: 2,
+		ReadWrites: []*protoblocktx.ReadWrite{
+			{Key: []byte("key1"), Value: []byte("value1"), Version: uint64Ptr(1)},
+		},
+	}
+
+	tx := &protoblocktx.Tx{
+		Namespaces: []*protoblocktx.TxNamespace{ns},
+		Signatures: [][]byte{[]byte("sig1")},
+	}
+	txBytes, err := proto.Marshal(tx)
+	require.NoError(t, err)
+
+	chdr := &common.ChannelHeader{
+		TxId: "txid123",
+	}
+	chdrBytes, err := proto.Marshal(chdr)
+	require.NoError(t, err)
+
+	payload := &common.Payload{
+		Header: &common.Header{
+			ChannelHeader: chdrBytes,
+		},
+		Data: txBytes,
+	}
+	payloadBytes, err := proto.Marshal(payload)
+	require.NoError(t, err)
+
+	env := &common.Envelope{
+		Payload: payloadBytes,
+	}
+
+	// Test rwSets extraction
+	nsDataList, err := rwSets(env)
+	require.NoError(t, err)
+	assert.Len(t, nsDataList, 1)
+	assert.Equal(t, "txid123", nsDataList[0].TxID)
+	assert.Equal(t, "chaincode1", nsDataList[0].Namespace.NsId)
+	assert.NotNil(t, nsDataList[0].Endorsement)
+}
+
+// TestParseWithBlindWrites tests parsing blocks with blind writes
+func TestParseWithBlindWrites(t *testing.T) {
+	ns := &protoblocktx.TxNamespace{
+		NsId:      "mycc",
+		NsVersion: 1,
+		BlindWrites: []*protoblocktx.Write{
+			{
+				Key:   []byte("blind_key"),
+				Value: []byte("blind_value"),
+			},
+		},
+	}
+
+	tx := &protoblocktx.Tx{
+		Namespaces: []*protoblocktx.TxNamespace{ns},
+	}
+	txBytes, _ := proto.Marshal(tx)
+
+	chdr := &common.ChannelHeader{
+		Type: int32(common.HeaderType_ENDORSER_TRANSACTION),
+		TxId: "tx_blind",
+	}
+	chdrBytes, _ := proto.Marshal(chdr)
+
+	payload := &common.Payload{
+		Header: &common.Header{
+			ChannelHeader: chdrBytes,
+		},
+		Data: txBytes,
+	}
+	payloadBytes, _ := proto.Marshal(payload)
+
+	env := &common.Envelope{
+		Payload: payloadBytes,
+	}
+	envBytes, _ := proto.Marshal(env)
+
+	block := &common.Block{
+		Header: &common.BlockHeader{
+			Number: 1,
+		},
+		Data: &common.BlockData{
+			Data: [][]byte{envBytes},
+		},
+		Metadata: &common.BlockMetadata{
+			Metadata: [][]byte{
+				{},
+				{},
+				{byte(protoblocktx.Status_COMMITTED)},
+			},
+		},
+	}
+
+	parsedData, _, err := Parse(block)
+	require.NoError(t, err)
+
+	assert.Len(t, parsedData.Writes, 1)
+	assert.True(t, parsedData.Writes[0].IsBlindWrite)
+	assert.Equal(t, "blind_key", parsedData.Writes[0].Key)
+}
+
+// TestParseSkipsInvalidTransactions tests that invalid transactions are skipped
+func TestParseSkipsInvalidTransactions(t *testing.T) {
+	block := &common.Block{
+		Header: &common.BlockHeader{
+			Number: 1,
+		},
+		Data: &common.BlockData{
+			Data: [][]byte{
+				[]byte("invalid_envelope_data"),
+			},
+		},
+		Metadata: &common.BlockMetadata{
+			Metadata: [][]byte{
+				{},
+				{},
+				{byte(protoblocktx.Status_COMMITTED)},
+			},
+		},
+	}
+
+	parsedData, blockInfo, err := Parse(block)
+	require.NoError(t, err)
+	assert.NotNil(t, blockInfo)
+	// Invalid envelope should be skipped, resulting in empty parsed data
+	assert.Len(t, parsedData.Writes, 0)
+	assert.Len(t, parsedData.Reads, 0)
+}
+
+// TestParseConfigTransaction tests parsing of config transactions
+func TestParseConfigTransaction(t *testing.T) {
+	configTx := &protoblocktx.ConfigTransaction{
+		Version:  1,
+		Envelope: []byte("config_envelope_data"),
+	}
+	configBytes, _ := proto.Marshal(configTx)
+
+	chdr := &common.ChannelHeader{
+		Type: int32(common.HeaderType_CONFIG),
+	}
+	chdrBytes, _ := proto.Marshal(chdr)
+
+	payload := &common.Payload{
+		Header: &common.Header{
+			ChannelHeader: chdrBytes,
+		},
+		Data: configBytes,
+	}
+	payloadBytes, _ := proto.Marshal(payload)
+
+	env := &common.Envelope{
+		Payload: payloadBytes,
+	}
+	envBytes, _ := proto.Marshal(env)
+
+	block := &common.Block{
+		Header: &common.BlockHeader{
+			Number: 0,
+		},
+		Data: &common.BlockData{
+			Data: [][]byte{envBytes},
+		},
+		Metadata: &common.BlockMetadata{
+			Metadata: [][]byte{
+				{},
+				{},
+				{byte(protoblocktx.Status_COMMITTED)},
+			},
+		},
+	}
+
+	parsedData, _, err := Parse(block)
+	require.NoError(t, err)
+
+	assert.Len(t, parsedData.Policies, 1)
+	assert.Equal(t, constants.MetaNamespaceID, parsedData.Policies[0].Namespace)
+}
+
+// Helper functions
+
+func uint64Ptr(v uint64) *uint64 {
+	return &v
+}
+
+func createEnvelope(t *testing.T, chdr *common.ChannelHeader, data []byte) *common.Envelope {
+	chdrBytes, err := proto.Marshal(chdr)
+	require.NoError(t, err)
+
+	payload := &common.Payload{
+		Header: &common.Header{
+			ChannelHeader: chdrBytes,
+		},
+		Data: data,
+	}
+	payloadBytes, err := proto.Marshal(payload)
+	require.NoError(t, err)
+
+	return &common.Envelope{
+		Payload: payloadBytes,
+	}
+}
+
+func marshalNamespacePolicies(t *testing.T, np *protoblocktx.NamespacePolicies) []byte {
+	data, err := proto.Marshal(np)
+	require.NoError(t, err)
+	return data
+}
