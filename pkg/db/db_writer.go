@@ -173,13 +173,13 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 
 	// Insert namespace policies
 	for _, p := range policies {
-		if len(p.Policy) == 0 {
+		if len(p.PolicyJSON) == 0 {
 			continue
 		}
 		if err := q.UpsertNamespacePolicy(ctx, dbsqlc.UpsertNamespacePolicyParams{
 			Namespace: p.Namespace,
 			Version:   int64(p.Version),
-			Policy:    p.Policy,
+			Policy:    p.PolicyJSON,
 		}); err != nil {
 			return err
 		}

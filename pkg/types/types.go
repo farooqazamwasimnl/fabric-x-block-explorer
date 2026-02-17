@@ -6,6 +6,8 @@ SPDX-License-Identifier: Apache-2.0
 
 package types
 
+import "encoding/json"
+
 type ProcessedBlock struct {
 	Number    uint64
 	Txns      int
@@ -104,9 +106,9 @@ type EndorsementRecord struct {
 
 // NamespacePolicyRecord represents a policy update for a namespace.
 type NamespacePolicyRecord struct {
-	Namespace string
-	Version   uint64
-	Policy    []byte
+	Namespace  string
+	Version    uint64
+	PolicyJSON json.RawMessage
 }
 
 // ParsedBlockData contains writes, reads, and namespace records.

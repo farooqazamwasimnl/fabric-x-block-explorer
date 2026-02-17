@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS namespace_policies (
     id BIGSERIAL PRIMARY KEY,
     namespace TEXT NOT NULL,
     version BIGINT NOT NULL,
-    policy BYTEA NOT NULL,
+    policy JSONB,
     UNIQUE (namespace, version)
 );
 

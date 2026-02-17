@@ -56,10 +56,10 @@ type EndorsementResponse struct {
 }
 
 type NamespacePolicyResponse struct {
-	ID        int64  `json:"id"`
-	Namespace string `json:"namespace"`
-	Version   int64  `json:"version"`
-	Policy    string `json:"policy"`
+	ID        int64           `json:"id"`
+	Namespace string          `json:"namespace"`
+	Version   int64           `json:"version"`
+	Policy    json.RawMessage `json:"policy"`
 }
 
 type TxWithBlockResponse struct {

@@ -282,7 +282,7 @@ func (a *API) GetNamespacePolicies(w http.ResponseWriter, r *http.Request) {
 			ID:        row.ID,
 			Namespace: row.Namespace,
 			Version:   row.Version,
-			Policy:    hex.EncodeToString(row.Policy),
+			Policy:    json.RawMessage(row.Policy),
 		})
 		if latest {
 			break

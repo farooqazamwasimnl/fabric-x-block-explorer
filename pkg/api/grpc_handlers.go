@@ -277,7 +277,7 @@ func (s *GRPCServer) GetNamespacePolicies(ctx context.Context, req *pb.GetNamesp
 			Id:        row.ID,
 			Namespace: row.Namespace,
 			Version:   row.Version,
-			Policy:    hex.EncodeToString(row.Policy),
+			Policy:    string(row.Policy),
 		})
 		if req.Latest {
 			break

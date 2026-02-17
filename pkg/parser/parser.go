@@ -7,11 +7,15 @@ SPDX-License-Identifier: Apache-2.0
 package parser
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/types"
 	"github.com/hyperledger/fabric-protos-go-apiv2/common"
+	"github.com/hyperledger/fabric-protos-go-apiv2/msp"
+	"github.com/hyperledger/fabric-protos-go-apiv2/peer"
 	"github.com/hyperledger/fabric-x-committer/api/protoblocktx"
 	"google.golang.org/protobuf/proto"
 )
@@ -83,12 +87,25 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 			txNamespaces = append(txNamespaces, txNsRecord)
 
 			if len(rw.Endorsement) > 0 {
-				endorsements = append(endorsements, types.EndorsementRecord{
-					BlockNum:    header.Number,
-					TxNum:       uint64(txNum),
-					NsID:        rw.Namespace,
-					Endorsement: rw.Endorsement,
-				})
+				// Try to extract identity from endorsement; fallback to signature-only
+				mspID, identityJSON, err := endorsementToIdentityJSON(rw.Endorsement)
+				if err != nil {
+					endorsements = append(endorsements, types.EndorsementRecord{
+						BlockNum:    header.Number,
+						TxNum:       uint64(txNum),
+						NsID:        rw.Namespace,
+						Endorsement: rw.Endorsement,
+					})
+				} else {
+					endorsements = append(endorsements, types.EndorsementRecord{
+						BlockNum:    header.Number,
+						TxNum:       uint64(txNum),
+						NsID:        rw.Namespace,
+						Endorsement: rw.Endorsement,
+						MspID:       mspID,
+						Identity:    identityJSON,
+					})
+				}
 			}
 
 			for _, read := range rw.Rwset.Reads {
@@ -132,6 +149,46 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 
 const metaNamespaceID = "_meta"
 
+// policyToJSON converts protobuf policy bytes to a JSON object with base64-encoded policy
+func policyToJSON(policyBytes []byte) (json.RawMessage, error) {
+	// Store as base64-encoded bytes in a simple JSON structure
+	// This allows storing in JSONB while preserving exact binary data
+	return json.Marshal(map[string]string{
+		"policy_bytes": base64.StdEncoding.EncodeToString(policyBytes),
+	})
+}
+
+// endorsementToIdentityJSON extracts identity information from endorsement protobuf
+func endorsementToIdentityJSON(endorsementBytes []byte) (*string, []byte, error) {
+	// Parse the Endorsement protobuf
+	endorsement := &peer.Endorsement{}
+	if err := proto.Unmarshal(endorsementBytes, endorsement); err != nil {
+		return nil, nil, fmt.Errorf("failed to unmarshal endorsement: %w", err)
+	}
+
+	// Parse the SerializedIdentity from endorser field
+	serializedID := &msp.SerializedIdentity{}
+	if err := proto.Unmarshal(endorsement.Endorser, serializedID); err != nil {
+		return nil, nil, fmt.Errorf("failed to unmarshal endorser: %w", err)
+	}
+
+	// Extract mspid
+	mspID := serializedID.Mspid
+
+	// Create identity JSON structure
+	identityData := map[string]interface{}{
+		"mspid":    serializedID.Mspid,
+		"id_bytes": base64.StdEncoding.EncodeToString(serializedID.IdBytes),
+	}
+
+	identityJSON, err := json.Marshal(identityData)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal identity: %w", err)
+	}
+
+	return &mspID, identityJSON, nil
+}
+
 // extractPolicies attempts to parse namespace policy updates from an envelope payload.
 // Returns ok=true if the payload is a policy update.
 func extractPolicies(env *common.Envelope) ([]types.NamespacePolicyRecord, bool) {
@@ -162,10 +219,15 @@ func extractPolicies(env *common.Envelope) ([]types.NamespacePolicyRecord, bool)
 			if ns == "" {
 				ns = metaNamespaceID
 			}
+			policyJSON, err := policyToJSON(pd.Policy)
+			if err != nil {
+				log.Printf("failed to convert policy to JSON for namespace %s: %v", ns, err)
+				continue
+			}
 			items = append(items, types.NamespacePolicyRecord{
-				Namespace: ns,
-				Version:   pd.Version,
-				Policy:    pd.Policy,
+				Namespace:  ns,
+				Version:    pd.Version,
+				PolicyJSON: policyJSON,
 			})
 		}
 		if len(items) > 0 {
@@ -175,11 +237,16 @@ func extractPolicies(env *common.Envelope) ([]types.NamespacePolicyRecord, bool)
 
 	configTx := &protoblocktx.ConfigTransaction{}
 	if err := proto.Unmarshal(pl.Data, configTx); err == nil && len(configTx.Envelope) > 0 {
+		policyJSON, err := policyToJSON(configTx.Envelope)
+		if err != nil {
+			log.Printf("failed to convert config envelope to JSON: %v", err)
+			return nil, false
+		}
 		return []types.NamespacePolicyRecord{
 			{
-				Namespace: metaNamespaceID,
-				Version:   configTx.Version,
-				Policy:    configTx.Envelope,
+				Namespace:  metaNamespaceID,
+				Version:    configTx.Version,
+				PolicyJSON: policyJSON,
 			},
 		}, true
 	}
