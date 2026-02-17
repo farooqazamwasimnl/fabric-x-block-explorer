@@ -38,18 +38,3 @@ CREATE TABLE IF NOT EXISTS tx_writes (
     is_blind_write BOOLEAN NOT NULL DEFAULT FALSE,
     read_version BIGINT
 );
-
-CREATE TABLE IF NOT EXISTS namespaces (
-    id BIGSERIAL PRIMARY KEY,
-    name BYTEA NOT NULL UNIQUE   
-);
-
-CREATE TABLE IF NOT EXISTS writesets (
-    id BIGSERIAL PRIMARY KEY,
-    namespace_id BIGINT NOT NULL REFERENCES namespaces(id),
-    block_num BIGINT NOT NULL,
-    tx_num BIGINT NOT NULL,
-    tx_id BYTEA NOT NULL,   
-    key BYTEA NOT NULL,     
-    value BYTEA
-);

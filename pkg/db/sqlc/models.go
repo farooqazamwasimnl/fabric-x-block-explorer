@@ -15,11 +15,6 @@ type Block struct {
 	DataHash     []byte `json:"data_hash"`
 }
 
-type Namespace struct {
-	ID   int64  `json:"id"`
-	Name []byte `json:"name"`
-}
-
 type Transaction struct {
 	ID             int64  `json:"id"`
 	BlockNum       int64  `json:"block_num"`
@@ -50,14 +45,4 @@ type TxWrite struct {
 	Value         []byte      `json:"value"`
 	IsBlindWrite  bool        `json:"is_blind_write"`
 	ReadVersion   pgtype.Int8 `json:"read_version"`
-}
-
-type Writeset struct {
-	ID          int64  `json:"id"`
-	NamespaceID int64  `json:"namespace_id"`
-	BlockNum    int64  `json:"block_num"`
-	TxNum       int64  `json:"tx_num"`
-	TxID        []byte `json:"tx_id"`
-	Key         []byte `json:"key"`
-	Value       []byte `json:"value"`
 }

@@ -88,8 +88,7 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 		return err
 	}
 
-	// Cache namespace IDs, transaction IDs, and tx_namespace IDs
-	nsCache := make(map[string]int64)
+	// Cache transaction IDs and tx_namespace IDs
 	txIDCache := make(map[string]int64)
 	txNsCache := make(map[string]int64)
 
@@ -107,43 +106,6 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 				return err
 			}
 			txIDCache[txKey] = txID
-		}
-	}
-
-	for _, w := range writes {
-		nsID, found := nsCache[w.Namespace]
-		if !found {
-			id, err := q.UpsertNamespace(ctx, []byte(w.Namespace))
-			if err != nil {
-				return err
-			}
-			nsID = id
-			nsCache[w.Namespace] = id
-		}
-
-		txKey := fmt.Sprintf("%d-%d", w.BlockNum, w.TxNum)
-		if _, found := txIDCache[txKey]; !found {
-			txID, err := q.InsertTransaction(ctx, dbsqlc.InsertTransactionParams{
-				BlockNum:       int64(w.BlockNum),
-				TxNum:          int64(w.TxNum),
-				TxID:           []byte(w.TxID),
-				ValidationCode: int64(w.ValidationCode),
-			})
-			if err != nil {
-				return err
-			}
-			txIDCache[txKey] = txID
-		}
-
-		if err := q.InsertWrite(ctx, dbsqlc.InsertWriteParams{
-			NamespaceID: nsID,
-			BlockNum:    int64(w.BlockNum),
-			TxNum:       int64(w.TxNum),
-			TxID:        []byte(w.TxID),
-			Key:         []byte(w.Key),
-			Value:       w.Value,
-		}); err != nil {
-			return err
 		}
 	}
 
