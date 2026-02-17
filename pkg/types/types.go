@@ -20,8 +20,9 @@ type ReadWriteSet struct {
 }
 
 type KVRead struct {
-	Key     string
-	Version *Version
+	Key         string
+	Version     *Version
+	IsReadWrite bool
 }
 
 type KVWrite struct {
@@ -76,8 +77,19 @@ type TxNamespaceRecord struct {
 	ValidationCode int32
 }
 
-// ParsedBlockData contains both writes and namespace records.
+// ReadRecord represents a single read operation in a transaction.
+type ReadRecord struct {
+	BlockNum      uint64
+	TxNum         uint64
+	NsID          string
+	Key           string
+	Version       *uint64
+	IsReadWrite   bool
+}
+
+// ParsedBlockData contains writes, reads, and namespace records.
 type ParsedBlockData struct {
 	Writes       []WriteRecord
+	Reads        []ReadRecord
 	TxNamespaces []TxNamespaceRecord
 }

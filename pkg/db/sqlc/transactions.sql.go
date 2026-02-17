@@ -7,6 +7,8 @@ package dbsqlc
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const getTransactionByTxID = `-- name: GetTransactionByTxID :one
@@ -112,10 +114,11 @@ func (q *Queries) InsertTransaction(ctx context.Context, arg InsertTransactionPa
 	return id, err
 }
 
-const insertTxNamespace = `-- name: InsertTxNamespace :exec
+const insertTxNamespace = `-- name: InsertTxNamespace :one
 INSERT INTO tx_namespaces (transaction_id, ns_id, ns_version)
 VALUES ($1, $2, $3)
-ON CONFLICT (transaction_id, ns_id) DO NOTHING
+ON CONFLICT (transaction_id, ns_id) DO UPDATE SET ns_version = EXCLUDED.ns_version
+RETURNING id
 `
 
 type InsertTxNamespaceParams struct {
@@ -124,7 +127,31 @@ type InsertTxNamespaceParams struct {
 	NsVersion     int64  `json:"ns_version"`
 }
 
-func (q *Queries) InsertTxNamespace(ctx context.Context, arg InsertTxNamespaceParams) error {
-	_, err := q.db.Exec(ctx, insertTxNamespace, arg.TransactionID, arg.NsID, arg.NsVersion)
+func (q *Queries) InsertTxNamespace(ctx context.Context, arg InsertTxNamespaceParams) (int64, error) {
+	row := q.db.QueryRow(ctx, insertTxNamespace, arg.TransactionID, arg.NsID, arg.NsVersion)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const insertTxRead = `-- name: InsertTxRead :exec
+INSERT INTO tx_reads (tx_namespace_id, key, version, is_read_write)
+VALUES ($1, $2, $3, $4)
+`
+
+type InsertTxReadParams struct {
+	TxNamespaceID int64       `json:"tx_namespace_id"`
+	Key           []byte      `json:"key"`
+	Version       pgtype.Int8 `json:"version"`
+	IsReadWrite   bool        `json:"is_read_write"`
+}
+
+func (q *Queries) InsertTxRead(ctx context.Context, arg InsertTxReadParams) error {
+	_, err := q.db.Exec(ctx, insertTxRead,
+		arg.TxNamespaceID,
+		arg.Key,
+		arg.Version,
+		arg.IsReadWrite,
+	)
 	return err
 }

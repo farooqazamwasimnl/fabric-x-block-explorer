@@ -22,6 +22,14 @@ CREATE TABLE IF NOT EXISTS tx_namespaces (
     UNIQUE (transaction_id, ns_id)
 );
 
+CREATE TABLE IF NOT EXISTS tx_reads (
+    id BIGSERIAL PRIMARY KEY,
+    tx_namespace_id BIGINT NOT NULL REFERENCES tx_namespaces(id),
+    key BYTEA NOT NULL,
+    version BIGINT,
+    is_read_write BOOLEAN NOT NULL DEFAULT FALSE
+);
+
 CREATE TABLE IF NOT EXISTS namespaces (
     id BIGSERIAL PRIMARY KEY,
     name BYTEA NOT NULL UNIQUE   

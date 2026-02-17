@@ -21,7 +21,12 @@ SELECT id
 FROM transactions
 WHERE block_num = $1 AND tx_num = $2;
 
--- name: InsertTxNamespace :exec
+-- name: InsertTxNamespace :one
 INSERT INTO tx_namespaces (transaction_id, ns_id, ns_version)
 VALUES ($1, $2, $3)
-ON CONFLICT (transaction_id, ns_id) DO NOTHING;
+ON CONFLICT (transaction_id, ns_id) DO UPDATE SET ns_version = EXCLUDED.ns_version
+RETURNING id;
+
+-- name: InsertTxRead :exec
+INSERT INTO tx_reads (tx_namespace_id, key, version, is_read_write)
+VALUES ($1, $2, $3, $4);

@@ -4,6 +4,10 @@
 
 package dbsqlc
 
+import (
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
 type Block struct {
 	BlockNum     int64  `json:"block_num"`
 	TxCount      int32  `json:"tx_count"`
@@ -29,6 +33,14 @@ type TxNamespace struct {
 	TransactionID int64  `json:"transaction_id"`
 	NsID          string `json:"ns_id"`
 	NsVersion     int64  `json:"ns_version"`
+}
+
+type TxRead struct {
+	ID            int64       `json:"id"`
+	TxNamespaceID int64       `json:"tx_namespace_id"`
+	Key           []byte      `json:"key"`
+	Version       pgtype.Int8 `json:"version"`
+	IsReadWrite   bool        `json:"is_read_write"`
 }
 
 type Writeset struct {

@@ -18,11 +18,12 @@ import (
 // Parse converts a Fabric block into ParsedBlockData and BlockInfo.
 func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 	writes := []types.WriteRecord{}
+	reads := []types.ReadRecord{}
 	txNamespaces := []types.TxNamespaceRecord{}
 
 	header := b.GetHeader()
 	if header == nil {
-		return &types.ParsedBlockData{Writes: writes, TxNamespaces: txNamespaces}, nil, fmt.Errorf("block header missing")
+		return &types.ParsedBlockData{Writes: writes, Reads: reads, TxNamespaces: txNamespaces}, nil, fmt.Errorf("block header missing")
 	}
 
 	blockInfo := &types.BlockInfo{
@@ -32,7 +33,7 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 	}
 
 	if b.Metadata == nil || len(b.Metadata.Metadata) <= int(common.BlockMetadataIndex_TRANSACTIONS_FILTER) {
-		return &types.ParsedBlockData{Writes: writes, TxNamespaces: txNamespaces}, blockInfo, fmt.Errorf("block metadata missing TRANSACTIONS_FILTER")
+		return &types.ParsedBlockData{Writes: writes, Reads: reads, TxNamespaces: txNamespaces}, blockInfo, fmt.Errorf("block metadata missing TRANSACTIONS_FILTER")
 	}
 	txFilter := b.Metadata.Metadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER]
 
@@ -72,6 +73,20 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 			}
 			txNamespaces = append(txNamespaces, txNsRecord)
 
+			for _, read := range rw.Rwset.Reads {
+				readRecord := types.ReadRecord{
+					BlockNum:    header.Number,
+					TxNum:       uint64(txNum),
+					NsID:        rw.Namespace,
+					Key:         read.Key,
+					IsReadWrite: read.IsReadWrite,
+				}
+				if read.Version != nil {
+					readRecord.Version = &read.Version.BlockNum
+				}
+				reads = append(reads, readRecord)
+			}
+
 			records := types.Records(
 				rw.Namespace,
 				header.Number,
@@ -90,6 +105,7 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 
 	return &types.ParsedBlockData{
 		Writes:       writes,
+		Reads:        reads,
 		TxNamespaces: txNamespaces,
 	}, blockInfo, nil
 }
@@ -121,6 +137,16 @@ func rwSets(env *common.Envelope) ([]nsRwset, error) {
 			Writes: []types.KVWrite{},
 		}
 
+		for _, ro := range ns.ReadsOnly {
+			read := types.KVRead{Key: string(ro.Key), IsReadWrite: false}
+			if ro.Version != nil && *ro.Version > 0 {
+				read.Version = &types.Version{
+					BlockNum: *ro.Version,
+				}
+			}
+			rws.Reads = append(rws.Reads, read)
+		}
+
 		for _, bw := range ns.BlindWrites {
 			rws.Writes = append(rws.Writes, types.KVWrite{
 				Key:   string(bw.Key),
@@ -129,7 +155,7 @@ func rwSets(env *common.Envelope) ([]nsRwset, error) {
 		}
 
 		for _, rw := range ns.ReadWrites {
-			read := types.KVRead{Key: string(rw.Key)}
+			read := types.KVRead{Key: string(rw.Key), IsReadWrite: true}
 			if rw.Version != nil && *rw.Version > 0 {
 				read.Version = &types.Version{
 					BlockNum: *rw.Version,

@@ -13,6 +13,7 @@ import (
 	"log"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	dbsqlc "github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/db/sqlc"
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/types"
@@ -51,6 +52,7 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 		return errors.New("processed block Data is not *types.ParsedBlockData")
 	}
 	writes := parsedData.Writes
+	reads := parsedData.Reads
 	txNamespaces := parsedData.TxNamespaces
 
 	var (
@@ -86,9 +88,10 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 		return err
 	}
 
-	// Cache namespace IDs and transaction IDs to avoid repeated lookups
+	// Cache namespace IDs, transaction IDs, and tx_namespace IDs
 	nsCache := make(map[string]int64)
 	txIDCache := make(map[string]int64)
+	txNsCache := make(map[string]int64)
 
 	// Insert all transactions first (some may not have writes)
 	for _, txNs := range txNamespaces {
@@ -149,10 +152,35 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 		txKey := fmt.Sprintf("%d-%d", txNs.BlockNum, txNs.TxNum)
 		txID := txIDCache[txKey]
 
-		if err := q.InsertTxNamespace(ctx, dbsqlc.InsertTxNamespaceParams{
+		txNsID, err := q.InsertTxNamespace(ctx, dbsqlc.InsertTxNamespaceParams{
 			TransactionID: txID,
 			NsID:          txNs.NsID,
 			NsVersion:     int64(txNs.NsVersion),
+		})
+		if err != nil {
+			return err
+		}
+
+		txNsKey := fmt.Sprintf("%d-%d-%s", txNs.BlockNum, txNs.TxNum, txNs.NsID)
+		txNsCache[txNsKey] = txNsID
+	}
+
+	// Insert reads
+	for _, r := range reads {
+		txNsKey := fmt.Sprintf("%d-%d-%s", r.BlockNum, r.TxNum, r.NsID)
+		txNsID := txNsCache[txNsKey]
+
+		var version pgtype.Int8
+		if r.Version != nil {
+			version.Int64 = int64(*r.Version)
+			version.Valid = true
+		}
+
+		if err := q.InsertTxRead(ctx, dbsqlc.InsertTxReadParams{
+			TxNamespaceID: txNsID,
+			Key:           []byte(r.Key),
+			Version:       version,
+			IsReadWrite:   r.IsReadWrite,
 		}); err != nil {
 			return err
 		}
@@ -163,6 +191,6 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 	}
 	committed = true
 
-	log.Printf("db: stored block %d with %d writes", pb.BlockInfo.Number, len(writes))
+	log.Printf("db: stored block %d with %d writes, %d reads", pb.BlockInfo.Number, len(writes), len(reads))
 	return nil
 }
