@@ -43,6 +43,15 @@ type TxRead struct {
 	IsReadWrite   bool        `json:"is_read_write"`
 }
 
+type TxWrite struct {
+	ID            int64       `json:"id"`
+	TxNamespaceID int64       `json:"tx_namespace_id"`
+	Key           []byte      `json:"key"`
+	Value         []byte      `json:"value"`
+	IsBlindWrite  bool        `json:"is_blind_write"`
+	ReadVersion   pgtype.Int8 `json:"read_version"`
+}
+
 type Writeset struct {
 	ID          int64  `json:"id"`
 	NamespaceID int64  `json:"namespace_id"`

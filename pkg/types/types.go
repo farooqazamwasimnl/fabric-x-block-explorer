@@ -26,8 +26,10 @@ type KVRead struct {
 }
 
 type KVWrite struct {
-	Key   string
-	Value []byte
+	Key          string
+	Value        []byte
+	IsBlindWrite bool
+	ReadVersion  *uint64
 }
 
 type Version struct {
@@ -44,18 +46,22 @@ type WriteRecord struct {
 	Value          []byte
 	TxID           string
 	ValidationCode int32
+	IsBlindWrite   bool
+	ReadVersion    *uint64
 }
 
 func Records(namespace string, blockNum, txNum uint64, txID string, rws ReadWriteSet) []WriteRecord {
 	rec := make([]WriteRecord, len(rws.Writes))
 	for i, w := range rws.Writes {
 		rec[i] = WriteRecord{
-			Namespace: namespace,
-			BlockNum:  blockNum,
-			TxNum:     txNum,
-			TxID:      txID,
-			Key:       w.Key,
-			Value:     w.Value,
+			Namespace:    namespace,
+			BlockNum:     blockNum,
+			TxNum:        txNum,
+			TxID:         txID,
+			Key:          w.Key,
+			Value:        w.Value,
+			IsBlindWrite: w.IsBlindWrite,
+			ReadVersion:  w.ReadVersion,
 		}
 	}
 	return rec

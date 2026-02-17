@@ -149,23 +149,29 @@ func rwSets(env *common.Envelope) ([]nsRwset, error) {
 
 		for _, bw := range ns.BlindWrites {
 			rws.Writes = append(rws.Writes, types.KVWrite{
-				Key:   string(bw.Key),
-				Value: bw.Value,
+				Key:          string(bw.Key),
+				Value:        bw.Value,
+				IsBlindWrite: true,
+				ReadVersion:  nil,
 			})
 		}
 
 		for _, rw := range ns.ReadWrites {
 			read := types.KVRead{Key: string(rw.Key), IsReadWrite: true}
+			var readVersion *uint64
 			if rw.Version != nil && *rw.Version > 0 {
 				read.Version = &types.Version{
 					BlockNum: *rw.Version,
 				}
+				readVersion = rw.Version
 			}
 			rws.Reads = append(rws.Reads, read)
 
 			rws.Writes = append(rws.Writes, types.KVWrite{
-				Key:   string(rw.Key),
-				Value: rw.Value,
+				Key:          string(rw.Key),
+				Value:        rw.Value,
+				IsBlindWrite: false,
+				ReadVersion:  readVersion,
 			})
 		}
 

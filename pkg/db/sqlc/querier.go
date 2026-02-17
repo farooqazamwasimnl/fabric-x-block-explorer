@@ -19,6 +19,7 @@ type Querier interface {
 	InsertTransaction(ctx context.Context, arg InsertTransactionParams) (int64, error)
 	InsertTxNamespace(ctx context.Context, arg InsertTxNamespaceParams) (int64, error)
 	InsertTxRead(ctx context.Context, arg InsertTxReadParams) error
+	InsertTxWrite(ctx context.Context, arg InsertTxWriteParams) error
 	InsertWrite(ctx context.Context, arg InsertWriteParams) error
 	UpsertNamespace(ctx context.Context, name []byte) (int64, error)
 }

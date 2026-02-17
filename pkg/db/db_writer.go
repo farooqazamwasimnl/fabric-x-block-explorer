@@ -186,6 +186,28 @@ func (bw *BlockWriter) WriteProcessedBlock(ctx context.Context, pb *types.Proces
 		}
 	}
 
+	// Insert writes to tx_writes table
+	for _, w := range writes {
+		txNsKey := fmt.Sprintf("%d-%d-%s", w.BlockNum, w.TxNum, w.Namespace)
+		txNsID := txNsCache[txNsKey]
+
+		var readVersion pgtype.Int8
+		if w.ReadVersion != nil {
+			readVersion.Int64 = int64(*w.ReadVersion)
+			readVersion.Valid = true
+		}
+
+		if err := q.InsertTxWrite(ctx, dbsqlc.InsertTxWriteParams{
+			TxNamespaceID: txNsID,
+			Key:           []byte(w.Key),
+			Value:         w.Value,
+			IsBlindWrite:  w.IsBlindWrite,
+			ReadVersion:   readVersion,
+		}); err != nil {
+			return err
+		}
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return err
 	}

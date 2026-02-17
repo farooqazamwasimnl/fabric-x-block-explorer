@@ -155,3 +155,27 @@ func (q *Queries) InsertTxRead(ctx context.Context, arg InsertTxReadParams) erro
 	)
 	return err
 }
+
+const insertTxWrite = `-- name: InsertTxWrite :exec
+INSERT INTO tx_writes (tx_namespace_id, key, value, is_blind_write, read_version)
+VALUES ($1, $2, $3, $4, $5)
+`
+
+type InsertTxWriteParams struct {
+	TxNamespaceID int64       `json:"tx_namespace_id"`
+	Key           []byte      `json:"key"`
+	Value         []byte      `json:"value"`
+	IsBlindWrite  bool        `json:"is_blind_write"`
+	ReadVersion   pgtype.Int8 `json:"read_version"`
+}
+
+func (q *Queries) InsertTxWrite(ctx context.Context, arg InsertTxWriteParams) error {
+	_, err := q.db.Exec(ctx, insertTxWrite,
+		arg.TxNamespaceID,
+		arg.Key,
+		arg.Value,
+		arg.IsBlindWrite,
+		arg.ReadVersion,
+	)
+	return err
+}

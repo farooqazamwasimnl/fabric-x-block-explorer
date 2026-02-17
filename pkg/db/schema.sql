@@ -30,6 +30,15 @@ CREATE TABLE IF NOT EXISTS tx_reads (
     is_read_write BOOLEAN NOT NULL DEFAULT FALSE
 );
 
+CREATE TABLE IF NOT EXISTS tx_writes (
+    id BIGSERIAL PRIMARY KEY,
+    tx_namespace_id BIGINT NOT NULL REFERENCES tx_namespaces(id),
+    key BYTEA NOT NULL,
+    value BYTEA,
+    is_blind_write BOOLEAN NOT NULL DEFAULT FALSE,
+    read_version BIGINT
+);
+
 CREATE TABLE IF NOT EXISTS namespaces (
     id BIGSERIAL PRIMARY KEY,
     name BYTEA NOT NULL UNIQUE   

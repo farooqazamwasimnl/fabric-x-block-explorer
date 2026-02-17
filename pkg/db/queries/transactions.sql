@@ -30,3 +30,7 @@ RETURNING id;
 -- name: InsertTxRead :exec
 INSERT INTO tx_reads (tx_namespace_id, key, version, is_read_write)
 VALUES ($1, $2, $3, $4);
+
+-- name: InsertTxWrite :exec
+INSERT INTO tx_writes (tx_namespace_id, key, value, is_blind_write, read_version)
+VALUES ($1, $2, $3, $4, $5);
