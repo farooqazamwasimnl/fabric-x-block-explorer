@@ -65,20 +65,16 @@ func New(cfg Config, pool *pgxpool.Pool, streamer *sidecarstream.Streamer) *Pool
 	}
 }
 
-// Start runs the receiver, processors and writers and returns an errgroup
-// that the caller can Wait on. Errors are also reported to errCh (non-blocking).
+// Start runs the block processing pipeline.
 func (p *Pool) Start(ctx context.Context, errCh chan<- error) *errgroup.Group {
 	g, ctx := errgroup.WithContext(ctx)
 
-	// Receiver: start deliver and close rawCh when done.
 	g.Go(func() error {
 		defer close(p.rawCh)
-		// blockpipeline.BlockReceiver does not return a value; call it and return nil.
 		blockpipeline.BlockReceiver(ctx, p.streamer, p.rawCh, errCh, 0)
 		return nil
 	})
 
-	// Processors: spawn N processors that read rawCh and push to procCh.
 	var procWg sync.WaitGroup
 	for i := 0; i < p.cfg.ProcessorCount; i++ {
 		workerID := i
@@ -86,7 +82,6 @@ func (p *Pool) Start(ctx context.Context, errCh chan<- error) *errgroup.Group {
 		g.Go(func() error {
 			defer procWg.Done()
 			logger.Infof("processor[%d] started", workerID)
-			// BlockProcessor does not return a value; call it and return nil.
 			blockpipeline.BlockProcessor(ctx, p.rawCh, p.procCh, errCh)
 			logger.Infof("processor[%d] stopped", workerID)
 			return nil
@@ -103,12 +98,10 @@ func (p *Pool) Start(ctx context.Context, errCh chan<- error) *errgroup.Group {
 		return nil
 	})
 
-	// Writers: spawn writerCount writers. Each writer uses its own pgxpool.Conn.
 	for i := 0; i < p.cfg.WriterCount; i++ {
 		workerID := i
 		g.Go(func() error {
 			logger.Infof("writer[%d] started", workerID)
-			// Acquire a dedicated connection for this writer
 			conn, err := p.pool.Acquire(context.Background())
 			if err != nil {
 				select {

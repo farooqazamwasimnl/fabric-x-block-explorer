@@ -14,8 +14,7 @@ import (
 	"github.com/LF-Decentralized-Trust-labs/fabric-x-block-explorer/pkg/types"
 )
 
-// BlockWriter consumes ProcessedBlock values from 'in' and persists them using
-// the provided BlockWriter. Fatal errors and panics are reported on errCh.
+// BlockWriter persists processed blocks to the database.
 func BlockWriter(ctx context.Context, writer *db.BlockWriter, in <-chan *types.ProcessedBlock, errCh chan<- error) {
 	defer func() {
 		if r := recover(); r != nil {

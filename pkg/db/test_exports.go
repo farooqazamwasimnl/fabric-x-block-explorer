@@ -20,9 +20,7 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-// DatabaseTestEnv provides a test environment for database operations.
-// This follows the fabric-x-committer pattern of exposing test helpers
-// through test_exports.go.
+// DatabaseTestEnv provides a test database environment.
 type DatabaseTestEnv struct {
 	Pool    *pgxpool.Pool
 	Queries *dbsqlc.Queries
@@ -34,15 +32,12 @@ type DatabaseTestEnv struct {
 func NewDatabaseTestEnv(t *testing.T) *DatabaseTestEnv {
 	t.Helper()
 
-	// Create testcontainer
 	tc := dbtest.PrepareTestEnv(t)
 
-	// Initialize schema
 	ctx := context.Background()
 	_, err := tc.Pool.Exec(ctx, schemaSQL)
 	require.NoError(t, err, "failed to initialize database schema")
 
-	// Create queries
 	queries := dbsqlc.New(tc.Pool)
 
 	env := &DatabaseTestEnv{
@@ -51,7 +46,6 @@ func NewDatabaseTestEnv(t *testing.T) *DatabaseTestEnv {
 		tc:      tc,
 	}
 
-	// Register cleanup
 	t.Cleanup(func() {
 		tc.Close(t)
 	})
@@ -59,7 +53,7 @@ func NewDatabaseTestEnv(t *testing.T) *DatabaseTestEnv {
 	return env
 }
 
-// AssertBlockExists verifies that a block exists in the database
+// AssertBlockExists checks that a block exists.
 func (env *DatabaseTestEnv) AssertBlockExists(t *testing.T, blockNum int64) {
 	t.Helper()
 
@@ -69,7 +63,7 @@ func (env *DatabaseTestEnv) AssertBlockExists(t *testing.T, blockNum int64) {
 	require.Equal(t, blockNum, block.BlockNum)
 }
 
-// AssertBlockNotExists verifies that a block does not exist in the database
+// AssertBlockNotExists checks that a block does not exist.
 func (env *DatabaseTestEnv) AssertBlockNotExists(t *testing.T, blockNum int64) {
 	t.Helper()
 
@@ -78,7 +72,7 @@ func (env *DatabaseTestEnv) AssertBlockNotExists(t *testing.T, blockNum int64) {
 	require.Error(t, err, "block %d should not exist", blockNum)
 }
 
-// GetBlockCount returns the total number of blocks in the database
+// GetBlockCount returns the number of blocks.
 func (env *DatabaseTestEnv) GetBlockCount(t *testing.T) int64 {
 	t.Helper()
 

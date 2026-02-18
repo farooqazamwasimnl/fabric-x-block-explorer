@@ -23,7 +23,7 @@ import (
 
 var logger = logging.New("parser")
 
-// Parse converts a Fabric block into ParsedBlockData and BlockInfo.
+// Parse extracts transactions and writesets from a block.
 func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 	writes := []types.WriteRecord{}
 	reads := []types.ReadRecord{}
@@ -57,27 +57,23 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 			continue
 		}
 
-		// Unmarshal envelope
 		env := &common.Envelope{}
 		if err := proto.Unmarshal(envBytes, env); err != nil {
 			logger.Warnf("block %d tx %d invalid envelope: %v", header.Number, txNum, err)
 			continue
 		}
 
-		// Check for namespace policy updates first
 		if policyItems, ok := extractPolicies(env); ok {
 			policies = append(policies, policyItems...)
 			continue
 		}
 
-		// Extract RW sets (normal transaction)
 		nsList, err := rwSets(env)
 		if err != nil {
 			logger.Warnf("block %d tx %d invalid rwset: %v", header.Number, txNum, err)
 			continue
 		}
 
-		// Process each namespace in the transaction
 		for _, nsData := range nsList {
 			ns := nsData.Namespace
 
@@ -92,7 +88,6 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 			txNamespaces = append(txNamespaces, txNsRecord)
 
 			if len(nsData.Endorsement) > 0 {
-				// Try to extract identity from endorsement; fallback to signature-only
 				mspID, identityJSON, err := endorsementToIdentityJSON(nsData.Endorsement)
 				if err != nil {
 					endorsements = append(endorsements, types.EndorsementRecord{
@@ -113,7 +108,6 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 				}
 			}
 
-			// Process reads from ReadsOnly
 			for _, ro := range ns.ReadsOnly {
 				readRecord := types.ReadRecord{
 					BlockNum:    header.Number,
@@ -128,7 +122,6 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 				reads = append(reads, readRecord)
 			}
 
-			// Process reads and writes from ReadWrites
 			for _, rw := range ns.ReadWrites {
 				// Add to reads
 				readRecord := types.ReadRecord{
@@ -143,7 +136,6 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 				}
 				reads = append(reads, readRecord)
 
-				// Add to writes
 				writes = append(writes, types.WriteRecord{
 					Namespace:      ns.NsId,
 					Key:            string(rw.Key),
@@ -157,7 +149,6 @@ func Parse(b *common.Block) (*types.ParsedBlockData, *types.BlockInfo, error) {
 				})
 			}
 
-			// Process BlindWrites
 			for _, bw := range ns.BlindWrites {
 				writes = append(writes, types.WriteRecord{
 					Namespace:      ns.NsId,
@@ -196,22 +187,18 @@ func policyToJSON(policyBytes []byte) (json.RawMessage, error) {
 
 // endorsementToIdentityJSON extracts identity information from endorsement protobuf
 func endorsementToIdentityJSON(endorsementBytes []byte) (*string, []byte, error) {
-	// Parse the Endorsement protobuf
 	endorsement := &peer.Endorsement{}
 	if err := proto.Unmarshal(endorsementBytes, endorsement); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal endorsement: %w", err)
 	}
 
-	// Parse the SerializedIdentity from endorser field
 	serializedID := &msp.SerializedIdentity{}
 	if err := proto.Unmarshal(endorsement.Endorser, serializedID); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal endorser: %w", err)
 	}
 
-	// Extract mspid
 	mspID := serializedID.Mspid
 
-	// Create identity JSON structure
 	identityData := map[string]interface{}{
 		"mspid":    serializedID.Mspid,
 		"id_bytes": base64.StdEncoding.EncodeToString(serializedID.IdBytes),
@@ -225,8 +212,7 @@ func endorsementToIdentityJSON(endorsementBytes []byte) (*string, []byte, error)
 	return &mspID, identityJSON, nil
 }
 
-// extractPolicies attempts to parse namespace policy updates from an envelope payload.
-// Returns ok=true if the payload is a policy update.
+// extractPolicies parses namespace policy updates from the envelope.
 func extractPolicies(env *common.Envelope) ([]types.NamespacePolicyRecord, bool) {
 	pl := &common.Payload{}
 	if err := proto.Unmarshal(env.Payload, pl); err != nil {

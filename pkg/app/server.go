@@ -39,12 +39,9 @@ type Server struct {
 
 // New creates a new Server instance.
 func New(cfg *config.Config) (*Server, error) {
-	// Validate configuration
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-
-	// Initialize database
 	pool, err := db.NewPostgres(db.Config{
 		Host:     cfg.DB.Host,
 		Port:     cfg.DB.Port,
@@ -57,16 +54,13 @@ func New(cfg *config.Config) (*Server, error) {
 		return nil, err
 	}
 
-	// Create API server
 	apiServer := api.NewAPI(pool)
 
-	// Create HTTP server
 	httpServer := &http.Server{
 		Addr:    cfg.Server.HTTPAddr,
 		Handler: apiServer.Router(),
 	}
 
-	// Create gRPC server
 	grpcServer := grpc.NewServer()
 	grpcHandler := api.NewGRPCServer(apiServer)
 	pb.RegisterBlockExplorerServer(grpcServer, grpcHandler)

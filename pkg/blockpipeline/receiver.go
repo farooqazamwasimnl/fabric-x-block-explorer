@@ -19,9 +19,7 @@ import (
 
 var receiverLogger = logging.New("block-receiver")
 
-// BlockReceiver starts a long-running loop that connects to the Sidecar stream,
-// forwards received Fabric blocks to the 'out' channel and handles reconnection
-// with backoff. Fatal errors and panics are reported on errCh.
+// BlockReceiver streams blocks from the sidecar with automatic reconnection.
 func BlockReceiver(ctx context.Context, streamer *sidecarstream.Streamer, out chan<- *common.Block, errCh chan<- error, channelSize int) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -65,8 +63,7 @@ func BlockReceiver(ctx context.Context, streamer *sidecarstream.Streamer, out ch
 	}
 }
 
-// consumeBlocks reads from the provided blockCh and forwards non-nil blocks to out.
-// It returns an error when blockCh is closed unexpectedly. It respects ctx cancellation.
+// consumeBlocks forwards blocks from blockCh to out until blockCh closes.
 func consumeBlocks(ctx context.Context, blockCh <-chan *common.Block, out chan<- *common.Block) error {
 	for {
 		select {

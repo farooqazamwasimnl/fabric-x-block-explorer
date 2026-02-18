@@ -54,7 +54,7 @@ func PrepareTestEnv(t *testing.T) *TestContainer {
 	return prepareTestContainer(t, ctx)
 }
 
-// prepareLocalDB connects to a local PostgreSQL instance
+// prepareLocalDB connects to local postgres.
 func prepareLocalDB(t *testing.T, ctx context.Context) *TestContainer {
 	t.Helper()
 
@@ -81,7 +81,7 @@ func prepareLocalDB(t *testing.T, ctx context.Context) *TestContainer {
 	}
 }
 
-// cleanDatabase truncates all tables to ensure a clean state for each test
+// cleanDatabase drops all tables for a clean test state.
 func cleanDatabase(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 
@@ -97,11 +97,10 @@ func cleanDatabase(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	require.NoError(t, err, "failed to clean database")
 }
 
-// prepareTestContainer spins up a PostgreSQL testcontainer
+// prepareTestContainer creates a PostgreSQL testcontainer.
 func prepareTestContainer(t *testing.T, ctx context.Context) *TestContainer {
 	t.Helper()
 
-	// Create PostgreSQL testcontainer
 	postgresContainer, err := postgres.Run(ctx,
 		"postgres:14-alpine",
 		postgres.WithDatabase(testDBName),
@@ -115,15 +114,12 @@ func prepareTestContainer(t *testing.T, ctx context.Context) *TestContainer {
 	)
 	require.NoError(t, err, "failed to start postgres container")
 
-	// Get connection string
 	dsn, err := postgresContainer.ConnectionString(ctx, "sslmode=disable")
 	require.NoError(t, err, "failed to get connection string")
 
-	// Create connection pool
 	pool, err := pgxpool.New(ctx, dsn)
 	require.NoError(t, err, "failed to create connection pool")
 
-	// Verify connection
 	err = pool.Ping(ctx)
 	require.NoError(t, err, "failed to ping database")
 

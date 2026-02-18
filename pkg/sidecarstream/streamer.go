@@ -16,13 +16,13 @@ import (
 	"github.com/hyperledger/fabric-x-committer/utils/connection"
 )
 
-// Streamer wraps a sidecar client and configuration for delivering blocks.
+// Streamer wraps the fabric sidecar client.
 type Streamer struct {
 	cfg    config.SidecarConfig
 	client *sidecarclient.Client
 }
 
-// NewStreamer creates and returns a configured Streamer.
+// NewStreamer creates a new sidecar streamer.
 func NewStreamer(cfg config.SidecarConfig) (*Streamer, error) {
 	cc := &connection.ClientConfig{
 		Endpoint: &connection.Endpoint{
@@ -50,9 +50,7 @@ func NewStreamer(cfg config.SidecarConfig) (*Streamer, error) {
 	return s, nil
 }
 
-// StartDeliver starts a goroutine that calls the sidecar client's Deliver method.
-// Blocks received from the sidecar are forwarded to the provided out channel.
-// The goroutine logs when it exits and reports any Deliver error.
+// StartDeliver streams blocks from the sidecar to the out channel.
 func (s *Streamer) StartDeliver(ctx context.Context, out chan<- *common.Block) {
 	log.Printf("sidecarstream: StartDeliver channel=%s start=%d end=%d", s.cfg.ChannelID, s.cfg.StartBlk, s.cfg.EndBlk)
 
@@ -71,7 +69,7 @@ func (s *Streamer) StartDeliver(ctx context.Context, out chan<- *common.Block) {
 	}()
 }
 
-// CloseConnections closes any underlying connections held by the sidecar client.
+// CloseConnections closes the sidecar client connections.
 func (s *Streamer) CloseConnections() {
 	if s.client != nil {
 		s.client.CloseConnections()

@@ -18,8 +18,7 @@ import (
 
 var logger = logging.New("blockpipeline")
 
-// BlockProcessor reads raw blocks from 'in', processes them and sends
-// processed blocks to 'out'. Any fatal error is reported on errCh.
+// BlockProcessor parses raw blocks and sends them to the output channel.
 func BlockProcessor(ctx context.Context, in <-chan *common.Block, out chan<- *types.ProcessedBlock, errCh chan<- error) {
 	logger.Info("blockProcessor started")
 
@@ -54,7 +53,7 @@ func BlockProcessor(ctx context.Context, in <-chan *common.Block, out chan<- *ty
 	}
 }
 
-// processBlock converts a raw Fabric block into a ProcessedBlock using the parser package.
+// processBlock parses a raw block into structured data.
 func processBlock(blk *common.Block) (*types.ProcessedBlock, error) {
 	number := blk.GetHeader().GetNumber()
 	txCount := len(blk.GetData().GetData())
