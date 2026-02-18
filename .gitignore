@@ -17,3 +17,6 @@ explorer
 # Temporary files
 *.tmp
 *.log
+
+# Test coverage reports
+/coverage/
